@@ -858,10 +858,10 @@ def _print_report(result):
     print("REAL CONSUMPTION")
     print("  Total:", result["real_kwh"], "kWh in", result["real_hours"], "hours")
     print("  Periods:", result["periods_real_kwh"])
-    print("  By year (real | estimated kWh):")
+    print("  By year (real | estimated kWh, real hours):")
     for group in result["consumption_by_year"]:
-        print("    %s  %10.3f | %10.3f" % (
-            group["key"], group["real_kwh"], group["estimated_kwh"]))
+        print("    %s  %10.3f | %10.3f  | %6d h" % (
+            group["key"], group["real_kwh"], group["estimated_kwh"], group["real_hours"]))
         for name, slot in result["periods_by_year"].get(group["key"], {}).items():
             print("      %s  %8.3f | %8.3f" % (name, slot["real"], slot["estimated"]))
     print("  By month (real | estimated kWh):")
