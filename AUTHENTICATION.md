@@ -1,8 +1,8 @@
 # Authentication
 
-The starting point is always the tool. Run the `login` command. The tool opens
-the e-distribucion login page. Log in to the portal. Then choose one of three
-options to return the session to the tool.
+The starting point is the tool. Run the `login` command. The tool opens the
+e-distribucion login page. Log in to the portal. Then choose one of two ways to
+return the session to the tool.
 
 ```bash
 python edistribucion.py login
@@ -14,8 +14,7 @@ The tool asks:
 Log in to the portal. Then choose how to return the session:
   1. Paste a line from DevTools (the Cookie header, or 'Copy as cURL').
   2. Import a cookies.txt file.
-  3. Let the agent read it with the Chrome MCP.
-Choose 1, 2 or 3 [1]:
+Choose 1 or 2 [1]:
 ```
 
 You can pick the option in advance with `--method`:
@@ -24,8 +23,7 @@ You can pick the option in advance with `--method`:
 python edistribucion.py login --method 1
 ```
 
-All three options end with the same result. The file `sesion.json` holds the
-session. The session is the `sid` cookie.
+Both options write `sesion.json`. The session is the `sid` cookie.
 
 ## Option 1: paste a line from DevTools
 
@@ -65,24 +63,6 @@ You can also import the file directly, without the menu:
 python edistribucion.py import-cookies cookies.txt
 ```
 
-## Option 3: let the agent read the session
-
-This option uses the Chrome DevTools MCP with your normal Chrome.
-
-1. Log in to the portal.
-2. At the menu, choose 3. The tool shows the next step.
-3. Ask the agent: "save my e-distribucion session".
-4. The agent reads the `sid` value with the Chrome DevTools MCP. It reads the
-   `Cookie` header of a portal request.
-5. The agent calls the tool `edist_save_session` with the value.
-6. The tool writes `sesion.json`.
-
-Turn on remote debugging one time:
-
-1. Open `chrome://inspect/#remote-debugging`.
-2. Turn on Remote debugging.
-3. When the agent connects, Chrome asks for permission. Click Allow.
-
 ## Direct options
 
 You can also skip the menu.
@@ -108,8 +88,8 @@ python edistribucion.py status
 
 ## Notes
 
-- The `sid` cookie is HttpOnly. A web page cannot read it. The DevTools, an
-  extension, or the Chrome MCP can read it.
+- The `sid` cookie is HttpOnly. A web page cannot read it. The DevTools or an
+  extension can read it.
 - Do not share `sesion.json`. It is your live session.
 - When a command fails with an authentication error, run `login` again. The
   session expired.

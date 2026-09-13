@@ -1,8 +1,8 @@
 # e-distribucion client
 
 This tool reads your electricity consumption from the e-distribucion private
-area (Endesa group). It uses HTTP only. It runs in the terminal. It also works
-as an MCP server for agents.
+area (Endesa group). It uses HTTP only. It runs in the terminal. It is friendly
+for LLM agents. See [AGENTS.md](AGENTS.md).
 
 The client uses only the Python standard library.
 
@@ -29,11 +29,12 @@ POST requests to `/s/sfsites/aura`.
 ## Authentication
 
 Start with the `login` command. It opens the e-distribucion login page. Then it
-offers three ways to return the session to the tool:
+offers two ways to return the session to the tool:
 
 1. Paste a line from DevTools (the `Cookie` header, or "Copy as cURL").
 2. Import a `cookies.txt` file.
-3. Let the agent read the session with the Chrome MCP.
+
+You can also pass the session directly with `--sid`.
 
 Full steps are in [AUTHENTICATION.md](AUTHENTICATION.md).
 
@@ -96,36 +97,6 @@ Each hour has these fields.
 
 The command `cups` shows the contracted power for each supply. Example:
 `{"P1": 4.0}`.
-
-## MCP server
-
-The file `mcp_server.py` gives the client to an agent. It speaks MCP over
-stdio. Configuration example:
-
-```json
-{
-  "mcp": {
-    "edistribucion": {
-      "type": "local",
-      "command": ["python", "/absolute/path/to/mcp_server.py"],
-      "enabled": true
-    }
-  }
-}
-```
-
-Tools:
-
-| tool                      | description                                          |
-| ------------------------- | ---------------------------------------------------- |
-| `edist_save_session`      | save the session cookie (used for the MCP login)     |
-| `edist_status`            | account and supplies with contracted power           |
-| `edist_supplies`          | full supply list                                     |
-| `edist_periods`           | billing periods, contracts, and available range      |
-| `edist_month_consumption` | month consumption by P1/P2/P3, real or estimated     |
-| `edist_range_consumption` | consumption for a date range by P1/P2/P3             |
-
-The server reads the session from `EDIST_SID` or from `sesion.json`.
 
 ## Session
 
