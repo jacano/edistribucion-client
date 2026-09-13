@@ -27,7 +27,7 @@ This file tells an LLM agent what this tool is and how to use it.
   folder of the file, the current folder, and the user config folder.
 - If the report fails with an authentication error, the session expired. Tell
   the user to run `edistribucion login-backend`, or let the auto login do it.
-  See `AUTHENTICATION.md`.
+  See `docs/AUTHENTICATION.md`.
 
 ## Commands
 
@@ -92,6 +92,8 @@ The portal has no data before 2024-01-16.
 ## Files
 
 - `edistribucion.py`: the tool.
-- `AUTHENTICATION.md`: how to get the session.
-- `TARIFF_2_0TD.md`: the 2.0TD periods and the period calculation.
+- `pyproject.toml`: the install data and the `edistribucion` command.
 - `README.md`: the main guide.
+- `docs/INSTALL.md`: how to install and run the tool.
+- `docs/AUTHENTICATION.md`: how to get the session.
+- `docs/TARIFF_2_0TD.md`: the 2.0TD periods and the period calculation.

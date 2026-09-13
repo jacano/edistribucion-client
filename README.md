@@ -24,15 +24,18 @@ Endesa. Use it only with your own account. The portal can change at any time.
 
 ## Install as a tool
 
-Install the tool and get the `edistribucion` command:
+Install the tool from the folder of the project (the folder with
+`pyproject.toml`):
 
 ```bash
-pipx install .
-# or
-pip install .
+pipx install .        # recommended when you have pipx
 ```
 
-Then run the report:
+```bash
+pip install .         # else use pip
+```
+
+The install gives you the command `edistribucion`. Then run the report:
 
 ```bash
 edistribucion          # the same as: edistribucion report
@@ -46,18 +49,16 @@ You can also run the file without installing it:
 python edistribucion.py report
 ```
 
-The tool keeps the session and the credentials in one of these places, in this
-order:
-
-- the folder of the file (the source layout),
-- the current folder,
-- the user config folder (`%APPDATA%\edistribucion` on Windows,
-  `~/.config/edistribucion` on Linux and macOS).
+The tool looks for `session.json` and `credentials.json` in the folder of the
+file, the current folder, and the user config folder
+(`%APPDATA%\edistribucion` on Windows, `~/.config/edistribucion` on Linux and
+macOS). So the installed tool works from any folder. Full steps are in
+[INSTALL.md](docs/INSTALL.md).
 
 ## Authentication
 
 Get the session with one of these commands. Full steps are in
-[AUTHENTICATION.md](AUTHENTICATION.md).
+[docs/AUTHENTICATION.md](docs/AUTHENTICATION.md).
 
 - `login-backend` logs in with the user and the password. No browser. Add
   `--save` to store the credentials encrypted with the Windows DPAPI. Then the
@@ -122,7 +123,7 @@ WARNING: there are estimated consumptions.
 The tool asks the portal for one zip with the hourly curves and reads it. Then
 it deletes the zip from the portal. This is much faster than one call per month.
 The period (P1, P2, P3) is worked out from the 2.0TD calendar. All the details
-are in [TARIFF_2_0TD.md](TARIFF_2_0TD.md). The portal has no data before
+are in [docs/TARIFF_2_0TD.md](docs/TARIFF_2_0TD.md). The portal has no data before
 2024-01-16.
 
 ## Security
