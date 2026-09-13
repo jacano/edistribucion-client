@@ -61,6 +61,9 @@ python edistribucion.py maxpower
 # Full report: real consumption and power for the CUPS.
 python edistribucion.py report
 
+# Real days and consumption per period (P1, P2, P3).
+python edistribucion.py days
+
 # JSON output.
 python edistribucion.py consume --group year --json
 ```
