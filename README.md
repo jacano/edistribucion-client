@@ -84,6 +84,7 @@ CONSUMPTION
   Consumption        kWh            hours         P1         P2         P3
   Real          5797.068  15911 h (663 d)   1890.900   1704.064   2202.104
   Estimated     2742.983   7438 h (310 d)    810.040    657.056   1275.887
+  Total         8540.051  23349 h (973 d)   2700.940   2361.120   3477.991
   By year (real | estimated kWh, real | estimated hours):
     2024    2007.797 |    595.522  |   6265 h (261 d) |   2158 h ( 90 d)
       P1   606.608 |  165.083
