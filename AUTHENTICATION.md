@@ -206,6 +206,39 @@ Options:
 
 The profile stays on disk. On the next run, Chrome may still hold the session.
 
+## Option 6: attach to your running Chrome
+
+This option uses your normal Chrome. Nothing is launched. The tool connects to
+Chrome with the DevTools Protocol and reads the session cookie. The DevTools
+Protocol sees HttpOnly cookies, so no code injection is needed.
+
+Turn on remote debugging one time:
+
+1. Open `chrome://inspect/#remote-debugging` in Chrome.
+2. Turn on Remote debugging.
+
+Use:
+
+1. Log in to the portal in Chrome.
+2. Run the command.
+
+```bash
+python edistribucion.py login-attach
+```
+
+3. If Chrome asks for permission, click Allow.
+4. The tool reads the `sid` cookie, writes `sesion.json`, and checks the session.
+
+Options:
+
+- `--profile-dir PATH` points to another Chrome user data directory.
+- `--timeout SECONDS` changes the wait.
+
+How it works: Chrome writes a file `DevToolsActivePort` in its user data
+directory. The file holds the port and the WebSocket path. The tool reads that
+file, connects to `ws://127.0.0.1:<port>/devtools/browser/...`, and calls
+`Storage.getCookies`. That call returns the HttpOnly `sid`.
+
 ## Direct options
 
 You can also skip the menu.

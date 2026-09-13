@@ -752,6 +752,29 @@ def cmd_login_chrome(args):
         sys.exit(1)
 
 
+def cmd_login_attach(args):
+    from chrome_login import capture_sid_from_running
+    print("Reading the session from your running Chrome...")
+    try:
+        sid = capture_sid_from_running(user_data_dir=args.profile_dir, timeout=args.timeout)
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        sys.exit(1)
+    if not sid:
+        print("No portal session found. Log in to the portal in Chrome, then try again.",
+              file=sys.stderr)
+        sys.exit(1)
+    session = Session(sid=sid, path=args.session)
+    session.save()
+    print("Session saved to", args.session)
+    try:
+        account = Client(session).whoami()
+        print("Login OK. User:", account["name"])
+    except Exception as exc:
+        print("Session saved, but the check failed:", exc, file=sys.stderr)
+        sys.exit(1)
+
+
 def cmd_status(args):
     client, account, supplies = load_context(args)
     print(json.dumps({"name": account["name"], "supplies": len(supplies),
@@ -854,6 +877,12 @@ def build_parser():
     chrome_login.add_argument("--timeout", type=int, default=300)
     chrome_login.add_argument("--keep-open", action="store_true", help="leave Chrome open")
     chrome_login.set_defaults(func=cmd_login_chrome)
+
+    attach = sub.add_parser("login-attach", parents=[common],
+                            help="read the session from your running Chrome (DevTools)")
+    attach.add_argument("--profile-dir", help="Chrome user data dir")
+    attach.add_argument("--timeout", type=int, default=30)
+    attach.set_defaults(func=cmd_login_attach)
 
     sub.add_parser("status", parents=[common],
                    help="account and supplies").set_defaults(func=cmd_status)

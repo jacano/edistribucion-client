@@ -198,6 +198,46 @@ def capture_sid(login_url, profile_dir=None, port=9333, timeout=300, keep_open=F
     return sid
 
 
+def default_user_data_dir():
+    base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    return os.path.join(base, "Google", "Chrome", "User Data")
+
+
+def capture_sid_from_running(user_data_dir=None, timeout=30):
+    """Read the portal sid from the running Chrome over the DevTools Protocol.
+
+    Chrome must have remote debugging on (chrome://inspect/#remote-debugging).
+    Chrome then writes `DevToolsActivePort` in the user data directory. This
+    function reads that file and connects to the browser WebSocket endpoint.
+    The DevTools Protocol sees HttpOnly cookies.
+    """
+    user_data_dir = user_data_dir or default_user_data_dir()
+    port_file = os.path.join(user_data_dir, "DevToolsActivePort")
+    if not os.path.exists(port_file):
+        raise RuntimeError(
+            "Remote debugging is off. Open chrome://inspect/#remote-debugging "
+            "in Chrome and turn it on.")
+    with open(port_file, encoding="utf-8") as fh:
+        lines = [line.strip() for line in fh.read().splitlines() if line.strip()]
+    ws_url = "ws://127.0.0.1:%s%s" % (lines[0], lines[1])
+    tools = DevTools(ws_url)
+    sid = None
+    try:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            result = tools.call("Storage.getCookies")
+            for cookie in result.get("cookies", []):
+                if cookie.get("name") == "sid" and "edistribucion" in cookie.get("domain", ""):
+                    sid = cookie.get("value")
+                    break
+            if sid:
+                break
+            time.sleep(1)
+    finally:
+        tools.close()
+    return sid
+
+
 if __name__ == "__main__":
     url = sys.argv[1] if len(sys.argv) > 1 else "https://zonaprivada.edistribucion.com/areaprivada/s/login/"
     value = capture_sid(url, keep_open="--keep-open" in sys.argv)
