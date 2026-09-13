@@ -46,6 +46,7 @@ Use these commands. Do not guess new ones.
 | `python edistribucion.py periods` | contracts and the available date range |
 | `python edistribucion.py month --month YYYY-MM` | consumption for one month |
 | `python edistribucion.py range --from YYYY-MM-DD --to YYYY-MM-DD` | consumption for a range |
+| `python edistribucion.py total --real-only` | aggregate real consumption over the full history |
 | `python edistribucion.py login-backend` | log in with user and password, no browser |
 | `python edistribucion.py import-cookies` | import a cookies.txt |
 | `python edistribucion.py save --sid` | store a session value by hand |
@@ -79,6 +80,19 @@ The `kind` of a day is one of `measured`, `estimated`, `mixed`, or `no_data`.
 
 The `hourly` list has one row per hour. Each row has `date`, `hour`, `kwh`,
 `period` (`P1`, `P2`, `P3`), `method` (`measured` or `estimated`), and `real`.
+
+## Full history total
+
+Use `python edistribucion.py total --real-only` to sum the whole history.
+
+- The portal has no data before 2024-01-16.
+- The tool walks the history in 35-day steps. Each response covers up to 35
+  days. A larger range returns a transfer id and no data.
+- The output has `total_kwh`, `periods_kwh` (P1, P2, P3), `real_days`,
+  `real_hours`, `all_kwh`, and `by_year_kwh`.
+- `--real-only` counts measured hours only. Without it, the total includes all
+  methods.
+- Use `--from` and `--to` to limit the period. Use `--cont` to pick one supply.
 
 ## Rules for your answer
 

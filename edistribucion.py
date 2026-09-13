@@ -22,6 +22,7 @@ Session: session.json (or the EDIST_SID environment variable). Commands:
   python edistribucion.py periods [--cont <contId>]
   python edistribucion.py month --month 2026-09 [--cont <contId>] [--json]
   python edistribucion.py range --from 2026-09-01 --to 2026-09-30 [--cont <contId>] [--json]
+  python edistribucion.py total [--from 2024-01-16] [--to 2026-09-12] [--real-only] [--json]
 """
 import argparse
 import base64
@@ -748,6 +749,97 @@ def cmd_range(args):
     print_summary(summary, args.date_from, args.date_to, contract, args.json)
 
 
+CHUNK_DAYS = 35
+
+
+def cmd_total(args):
+    client, account, supplies = load_context(args)
+    contracts = supplies
+    if args.cont:
+        contracts = [item for item in supplies if item["contract_id"] == args.cont]
+        if not contracts:
+            print("Unknown contract:", args.cont, file=sys.stderr)
+            sys.exit(1)
+
+    ranges = []
+    for item in contracts:
+        info = client.get_info(item["contract_id"], account["visibility_id"])
+        dmin, dmax = info.get("minDate"), info.get("maxDate")
+        if not dmin or not dmax:
+            continue
+        if args.date_from and args.date_from > dmin:
+            dmin = args.date_from
+        if args.date_to and args.date_to < dmax:
+            dmax = args.date_to
+        if dmin <= dmax:
+            ranges.append((item["contract_id"], dmin, dmax))
+
+    seen = set()
+    total_all = total_real = 0.0
+    periods_all = {"P1": 0.0, "P2": 0.0, "P3": 0.0}
+    periods_real = {"P1": 0.0, "P2": 0.0, "P3": 0.0}
+    days = set()
+    hours_real = 0
+    by_year = {}
+    first = last = None
+
+    for cid, dmin, dmax in ranges:
+        cur = datetime.strptime(dmin, "%Y-%m-%d").date()
+        end = datetime.strptime(dmax, "%Y-%m-%d").date()
+        while cur <= end:
+            chunk_end = min(cur + timedelta(days=CHUNK_DAYS - 1), end)
+            data = client.get_curve(cid, cur.isoformat(), chunk_end.isoformat(),
+                                    account["visibility_id"])
+            for row in parse_curve(data):
+                key = (row["date"], row["hour"])
+                if key in seen:
+                    continue
+                seen.add(key)
+                kwh = row["kwh"] or 0.0
+                total_all += kwh
+                if row["period"] in periods_all:
+                    periods_all[row["period"]] += kwh
+                if row["method"] != "measured":
+                    continue
+                total_real += kwh
+                if row["period"] in periods_real:
+                    periods_real[row["period"]] += kwh
+                hours_real += 1
+                day = datetime.strptime(row["date"], "%d/%m/%Y").date()
+                days.add(day)
+                by_year[day.year] = by_year.get(day.year, 0.0) + kwh
+                if first is None or day < first:
+                    first = day
+                if last is None or day > last:
+                    last = day
+            cur = chunk_end + timedelta(days=1)
+
+    main_total = total_real if args.real_only else total_all
+    main_periods = periods_real if args.real_only else periods_all
+    result = {
+        "from": first.isoformat() if first else None,
+        "to": last.isoformat() if last else None,
+        "real_only": bool(args.real_only),
+        "total_kwh": round(main_total, 3),
+        "real_kwh": round(total_real, 3),
+        "all_kwh": round(total_all, 3),
+        "periods_kwh": {k: round(v, 3) for k, v in main_periods.items()},
+        "real_days": len(days),
+        "real_hours": hours_real,
+        "by_year_kwh": {str(y): round(v, 3) for y, v in sorted(by_year.items())},
+    }
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    print("Period:", result["from"], "->", result["to"])
+    print("Total:", result["total_kwh"], "kWh | real days:", result["real_days"],
+          "| real hours:", result["real_hours"])
+    print("P1:", result["periods_kwh"].get("P1"), "| P2:", result["periods_kwh"].get("P2"),
+          "| P3:", result["periods_kwh"].get("P3"))
+    print("All methods:", result["all_kwh"], "kWh | real:", result["real_kwh"], "kWh")
+    print("By year:", result["by_year_kwh"])
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         description="Unofficial HTTP-only client for e-distribucion (no browser)")
@@ -799,6 +891,16 @@ def build_parser():
     rng.add_argument("--cont")
     rng.add_argument("--json", action="store_true")
     rng.set_defaults(func=cmd_range)
+
+    total = sub.add_parser("total", parents=[common],
+                           help="aggregate consumption over the full history")
+    total.add_argument("--from", dest="date_from", help="YYYY-MM-DD")
+    total.add_argument("--to", dest="date_to", help="YYYY-MM-DD")
+    total.add_argument("--cont")
+    total.add_argument("--real-only", action="store_true",
+                       help="count measured hours only")
+    total.add_argument("--json", action="store_true")
+    total.set_defaults(func=cmd_total)
     return parser
 
 
