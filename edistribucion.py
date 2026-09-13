@@ -18,9 +18,9 @@ Session: session.json (or the EDIST_SID environment variable). Commands:
   python edistribucion.py import-cookies [FILE]  # import a cookies.txt
   python edistribucion.py save --sid "<value>"   # save a value by hand
   python edistribucion.py cups                   # list supplies
-  python edistribucion.py consume [--from YYYY-MM-DD] [--to YYYY-MM-DD]
+  python edistribucion.py consume --cups <CUPS> [--from YYYY-MM-DD] [--to YYYY-MM-DD]
                                   [--group hour|day|month|year] [--cont <id>] [--json]
-  python edistribucion.py maxpower [--from YYYY-MM] [--to YYYY-MM] [--cont <id>] [--json]
+  python edistribucion.py maxpower --cups <CUPS> [--from YYYY-MM] [--to YYYY-MM] [--json]
 """
 import argparse
 import base64
@@ -504,15 +504,6 @@ def load_context(args):
     return client, account, supplies
 
 
-def default_contract(account, supplies, contract):
-    if contract:
-        return contract
-    for item in supplies:
-        if not item.get("end"):
-            return item["contract_id"]
-    return supplies[0]["contract_id"]
-
-
 # ---------------------------------------------------------------- commands
 def cmd_save(args):
     session = Session(sid=args.sid, path=args.session)
@@ -652,13 +643,19 @@ def _compress_dates(days):
 
 
 def cmd_consume(args):
-    client, account, supplies = load_context(args)
+    client, account, all_supplies = load_context(args)
+    supplies = [item for item in all_supplies if item["cups"] == args.cups]
+    if not supplies:
+        print("Unknown CUPS:", args.cups, file=sys.stderr)
+        print("Run `cups` to list the CUPS values.", file=sys.stderr)
+        sys.exit(1)
     contracts = supplies
     if args.cont:
         contracts = [item for item in supplies if item["contract_id"] == args.cont]
         if not contracts:
             print("Unknown contract:", args.cont, file=sys.stderr)
             sys.exit(1)
+    current = next((item for item in supplies if not item.get("end")), supplies[-1])
 
     ranges = []
     for item in contracts:
@@ -728,6 +725,8 @@ def cmd_consume(args):
             "estimated_hours": value["estimated_hours"],
         })
     result = {
+        "cups": args.cups,
+        "contracted_power_kw": current.get("contracted_power_kw"),
         "from": first.isoformat() if first else None,
         "to": last.isoformat() if last else None,
         "group": args.group,
@@ -743,6 +742,8 @@ def cmd_consume(args):
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return
 
+    print("CUPS:", result["cups"], "| contracted power:",
+          result["contracted_power_kw"], "kW")
     print("Period:", result["from"], "->", result["to"], "| group:", args.group)
     print("Real:", result["real_kwh"], "kWh (%d h)" % real_hours,
           "| Estimated:", result["estimated_kwh"], "kWh (%d h)" % estimated_hours)
@@ -758,10 +759,14 @@ def cmd_consume(args):
 
 
 def cmd_maxpower(args):
-    client, account, supplies = load_context(args)
-    contract = default_contract(account, supplies, args.cont)
-    supply = next((item for item in supplies if item["contract_id"] == contract), supplies[0])
-    cups_id = supply.get("cups_id")
+    client, account, all_supplies = load_context(args)
+    supplies = [item for item in all_supplies if item["cups"] == args.cups]
+    if not supplies:
+        print("Unknown CUPS:", args.cups, file=sys.stderr)
+        print("Run `cups` to list the CUPS values.", file=sys.stderr)
+        sys.exit(1)
+    current = next((item for item in supplies if not item.get("end")), supplies[-1])
+    cups_id = current.get("cups_id")
     if not cups_id:
         print("No CUPS id for the contract.", file=sys.stderr)
         sys.exit(1)
@@ -781,12 +786,13 @@ def cmd_maxpower(args):
 
     data = client.get_maximeter(cups_id, account["visibility_id"], start, end)
     if args.json:
+        data = dict(data)
+        data["contracted_power_kw"] = current.get("contracted_power_kw")
         print(json.dumps(data, ensure_ascii=False, indent=2))
         return
 
-    print("CUPS:", data.get("cups"), "| contractId:", contract)
+    print("CUPS:", data.get("cups"), "| contracted power:", data.get("requestedPower"), "kW")
     print("Period:", start, "->", end)
-    print("Contracted power:", data.get("requestedPower"), "kW")
     print("Maximum:", data.get("maxValue"))
     print("Monthly maxima:")
     for point in data.get("lstData", []):
@@ -833,6 +839,7 @@ def build_parser():
 
     consume = sub.add_parser("consume", parents=[common],
                              help="aggregate consumption by hour, day, month or year")
+    consume.add_argument("--cups", required=True, help="the CUPS to aggregate (see `cups`)")
     consume.add_argument("--from", dest="date_from", help="YYYY-MM-DD")
     consume.add_argument("--to", dest="date_to", help="YYYY-MM-DD")
     consume.add_argument("--group", choices=["hour", "day", "month", "year"],
@@ -843,9 +850,9 @@ def build_parser():
 
     mp = sub.add_parser("maxpower", parents=[common],
                         help="maximum demanded power per month")
+    mp.add_argument("--cups", required=True, help="the CUPS to query (see `cups`)")
     mp.add_argument("--from", dest="date_from", help="YYYY-MM")
     mp.add_argument("--to", dest="date_to", help="YYYY-MM")
-    mp.add_argument("--cont")
     mp.add_argument("--json", action="store_true")
     mp.set_defaults(func=cmd_maxpower)
     return parser

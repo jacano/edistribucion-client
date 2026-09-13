@@ -44,22 +44,22 @@ python edistribucion.py login-backend
 # List supplies. Shows the CUPS id and the contracted power.
 python edistribucion.py cups
 
-# Aggregate consumption by day (default).
-python edistribucion.py consume
+# Aggregate consumption by day (default). The CUPS is required.
+python edistribucion.py consume --cups ES0031102226226018WR0F
 
 # Aggregate by hour of the day, month, or year.
-python edistribucion.py consume --group hour
-python edistribucion.py consume --group month
-python edistribucion.py consume --group year
+python edistribucion.py consume --cups ES0031102226226018WR0F --group hour
+python edistribucion.py consume --cups ES0031102226226018WR0F --group month
+python edistribucion.py consume --cups ES0031102226226018WR0F --group year
 
 # Limit the period.
-python edistribucion.py consume --from 2024-01-16 --to 2026-09-12 --group month
+python edistribucion.py consume --cups ES0031102226226018WR0F --from 2024-01-16 --to 2026-09-12 --group month
 
-# Maximum demanded power per month.
-python edistribucion.py maxpower
+# Maximum demanded power per month. The CUPS is required.
+python edistribucion.py maxpower --cups ES0031102226226018WR0F
 
 # JSON output.
-python edistribucion.py consume --group year --json
+python edistribucion.py consume --cups ES0031102226226018WR0F --group year --json
 ```
 
 The options `--sid` and `--session` go before or after the command.
@@ -67,6 +67,7 @@ The options `--sid` and `--session` go before or after the command.
 Example output:
 
 ```
+CUPS: ES0031102226226018WR0F | contracted power: {'P1': 4.0} kW
 Period: 2024-01-16 -> 2026-09-12 | group: month
 Real: 5797.054 kWh (15911 h) | Estimated: 2743.035 kWh (7390 h)
 Real periods: {'P1': 1890.896, 'P2': 1704.069, 'P3': 2202.089}
@@ -82,6 +83,8 @@ By month (real kWh | estimated kWh):
 
 | key | meaning |
 | --- | ------- |
+| `cups` | the CUPS used |
+| `contracted_power_kw` | the contracted power of the supply |
 | `real_kwh` | total measured consumption |
 | `estimated_kwh` | total estimated consumption |
 | `real_hours`, `estimated_hours` | count of measured and estimated hours |
