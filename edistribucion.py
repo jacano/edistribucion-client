@@ -892,6 +892,11 @@ def _max_demand(client, account, cups_id, year_from, year_to):
     return monthly
 
 
+def hours_days(hours):
+    """Return the hours and the same time in days, for example 15911 hours (663 days)."""
+    return "%d hours (%d days)" % (hours, round(hours / 24.0))
+
+
 def _print_report(result):
     print("REPORT")
     print("CUPS:", result["cups"])
@@ -900,16 +905,17 @@ def _print_report(result):
     print("Period:", result["from"], "->", result["to"])
     print()
     print("CONSUMPTION")
-    print("  Total real:", result["real_kwh"], "kWh in", result["real_hours"], "hours")
+    print("  Total real:", result["real_kwh"], "kWh in", hours_days(result["real_hours"]))
     print("  Total estimated:", result["estimated_kwh"], "kWh in",
-          result["estimated_hours"], "hours")
+          hours_days(result["estimated_hours"]))
     print("  Periods real:", result["periods_real_kwh"])
     print("  Periods estimated:", result["periods_estimated_kwh"])
     print("  By year (real | estimated kWh, real | estimated hours):")
     for group in result["consumption_by_year"]:
-        print("    %s  %10.3f | %10.3f  | %6d h | %6d h" % (
+        print("    %s  %10.3f | %10.3f  | %6d h (%3d d) | %6d h (%3d d)" % (
             group["key"], group["real_kwh"], group["estimated_kwh"],
-            group["real_hours"], group["estimated_hours"]))
+            group["real_hours"], round(group["real_hours"] / 24.0),
+            group["estimated_hours"], round(group["estimated_hours"] / 24.0)))
         for name, slot in result["periods_by_year"].get(group["key"], {}).items():
             print("      %s  %8.3f | %8.3f" % (name, slot["real"], slot["estimated"]))
     print("  By month (real | estimated kWh):")
@@ -932,7 +938,7 @@ def _print_report(result):
     if result["has_estimated"]:
         print("WARNING: there are estimated consumptions.")
         print("  Estimated:", result["estimated_kwh"], "kWh in",
-              result["estimated_hours"], "hours")
+              hours_days(result["estimated_hours"]))
         print("  Estimated dates:", ", ".join(result["estimated_days"]))
     else:
         print("No estimated consumptions. All data is real.")
