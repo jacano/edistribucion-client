@@ -721,27 +721,6 @@ def cmd_login_backend(args):
         sys.exit(1)
 
 
-def _compress_dates(days):
-    """Turn a sorted list of dates into short ranges."""
-    days = sorted(days)
-    parts = []
-    start = prev = None
-    for day in days:
-        if start is None:
-            start = prev = day
-        elif (day - prev).days == 1:
-            prev = day
-        else:
-            parts.append((start, prev))
-            start = prev = day
-    if start is not None:
-        parts.append((start, prev))
-    out = []
-    for first, last in parts:
-        out.append(first.isoformat() if first == last else "%s..%s" % (first, last))
-    return out
-
-
 def measure_tariff(listing, contracts):
     """Return the tariff name of a contract group, from the measure list."""
     wanted = {item["contract_id"] for item in contracts}
@@ -999,12 +978,10 @@ def _print_report(result):
               % (year, peak_kwh, peak_when, power_kw, power_when))
     print()
     if result["has_estimated"]:
-        print("ESTIMATED DATES")
-        print("  " + ", ".join(result["estimated_days"]))
         if result["last_real"] and result["last_real"] < result["to"]:
             print("NOTE: the last readings are estimated. The last real day is %s."
                   % result["last_real"])
-        print()
+            print()
         print("ESTIMATED MAP (R real, E estimated, M mixed, . no data)")
         months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -1076,7 +1053,6 @@ def cmd_report(args):
                                             for name, slot in sorted(periods.items())}
                                 for year, periods in sorted(data["periods_year"].items())},
             "has_estimated": bool(data["estimated_days"]),
-            "estimated_days": _compress_dates(data["estimated_days"]),
             "consumption_by_year": _groups_list(data["groups"]["year"]),
             "consumption_by_month": _groups_list(data["groups"]["month"]),
             "consumption_by_hour": _groups_list(data["groups"]["hour"]),
