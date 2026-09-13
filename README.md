@@ -88,6 +88,42 @@ protocol callback gets data from the page URL. The page cannot read an HttpOnly
 cookie. So the callback cannot carry the `sid`. That is why this step is
 manual.
 
+## Bookmarklet callback
+
+This flow does not need the `sid` cookie. The page runs the query for you.
+
+1. Register the protocol. Windows only.
+
+```bash
+python edistribucion.py register
+```
+
+2. Print the bookmarklet code.
+
+```bash
+python edistribucion.py bookmarklet
+```
+
+3. Create a bookmark in your browser. Use the printed text as the URL.
+4. Open the private area and log in.
+5. Click the bookmark and answer the prompt. Example answers:
+   - `status`
+   - `month 2026-09`
+   - `range 2026-09-01 2026-09-30`
+6. The page sends the result to the tool. The tool saves the result in
+   `callback.json`.
+7. Show the result.
+
+```bash
+python edistribucion.py callback
+```
+
+The agent uses the tool `edist_read_callback` to read the same file.
+
+This flow runs one query per click, and you must be logged in. The flow with
+`sesion.json` runs without you. Use the bookmarklet flow when the session is
+hard to copy.
+
 ## Commands
 
 ```bash

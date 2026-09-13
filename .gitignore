@@ -1,6 +1,9 @@
 # Session cookies (secret)
 sesion.json
 
+# Last bookmarklet callback (consumption data)
+callback.json
+
 # Python
 __pycache__/
 *.py[cod]

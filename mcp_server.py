@@ -12,7 +12,8 @@ import sys
 from datetime import date, datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from edistribucion import Client, Session, summarize, DEFAULT_SESSION  # noqa: E402
+from edistribucion import (Client, Session, summarize, format_callback,  # noqa: E402
+                           DEFAULT_SESSION, DEFAULT_CALLBACK)
 
 PROTOCOL_VERSION = "2024-11-05"
 KIND_LABELS = {"measured": "MEASURED", "estimated": "ESTIMATED",
@@ -76,6 +77,13 @@ def tool_supplies(_args):
     return json.dumps(client.list_supplies(account["visibility_id"]), ensure_ascii=False, indent=2)
 
 
+def tool_read_callback(_args):
+    if not os.path.exists(DEFAULT_CALLBACK):
+        return "No callback yet. Open the portal, log in, and click the bookmarklet."
+    payload = json.load(open(DEFAULT_CALLBACK, encoding="utf-8"))
+    return format_callback(payload)
+
+
 def tool_periods(args):
     client = get_client()
     account = client.whoami()
@@ -131,6 +139,10 @@ TOOLS = [
      "description": "List every supply (CUPS) with contracted power.",
      "inputSchema": {"type": "object", "properties": {}},
      "fn": tool_supplies},
+    {"name": "edist_read_callback",
+     "description": "Read the last result sent by the bookmarklet through the edist:// callback.",
+     "inputSchema": {"type": "object", "properties": {}},
+     "fn": tool_read_callback},
     {"name": "edist_periods",
      "description": "Billing periods / contracts and the available date range.",
      "inputSchema": {"type": "object", "properties": {

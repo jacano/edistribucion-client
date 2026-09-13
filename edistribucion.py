@@ -22,6 +22,7 @@ Session: sesion.json (or the EDIST_SID environment variable). Commands:
   python edistribucion.py range --from 2026-09-01 --to 2026-09-30 [--cont <contId>] [--json]
 """
 import argparse
+import base64
 import json
 import os
 import re
@@ -40,7 +41,11 @@ LOGIN_PAGE = "/areaprivada/s/login/"
 MEASURELIST_PAGE = "/areaprivada/s/wp-measurelist-v4"
 DETAIL_PAGE = "/areaprivada/s/wp-measure-detail-v4"
 
-DEFAULT_SESSION = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sesion.json")
+DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_SESSION = os.path.join(DIR, "sesion.json")
+DEFAULT_CALLBACK = os.path.join(DIR, "callback.json")
+BOOKMARKLET_FILE = os.path.join(DIR, "bookmarklet.js")
+CALLBACK_SCHEME = "edist"
 USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36")
 
@@ -408,6 +413,93 @@ def cmd_login(args):
         sys.exit(1)
 
 
+# ---------------------------------------------------------------- callback flow
+def parse_callback_url(url):
+    """Extract the JSON payload from an edist://callback?data=... URL."""
+    query = urllib.parse.urlsplit(url).query
+    params = urllib.parse.parse_qs(query)
+    data = (params.get("data") or [""])[0]
+    if not data:
+        raise ValueError("No data in callback URL")
+    data = urllib.parse.unquote(data)
+    data += "=" * (-len(data) % 4)
+    return json.loads(base64.b64decode(data).decode("utf-8"))
+
+
+def cmd_receive(args):
+    payload = parse_callback_url(args.url)
+    with open(args.out, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, ensure_ascii=False, indent=2)
+    print("Callback saved to", args.out)
+
+
+def format_callback(payload):
+    if payload.get("mode") == "status":
+        lines = ["Supplies:"]
+        for item in payload.get("supplies", []):
+            lines.append("  %-14s %s  %s -> %s  power=%s kW" % (
+                item.get("contract_id"), item.get("cups"), item.get("start"),
+                item.get("end") or "(open)", item.get("power_kw")))
+        return "\n".join(lines)
+    lines = [
+        "CUPS: %s | contractId: %s" % (payload.get("cups"), payload.get("contract_id")),
+        "Range: %s -> %s" % (payload.get("from"), payload.get("to")),
+        "Total: %s kWh | peak demand: %s kW" % (
+            payload.get("total_kwh"), payload.get("peak_demand_kw")),
+        "Periods (kWh): %s" % (payload.get("periods_kwh"),),
+        "Measured: %s kWh (%s h) | Estimated: %s kWh (%s h)" % (
+            payload.get("measured_kwh"), payload.get("measured_hours"),
+            payload.get("estimated_kwh"), payload.get("estimated_hours")),
+        "Daily detail:",
+    ]
+    for day in payload.get("days", []):
+        lines.append("  %s  %8.3f kWh  %-9s %s" % (
+            day["date"], day["kwh"], KIND_LABELS.get(day.get("kind"), ""), day.get("periods")))
+    return "\n".join(lines)
+
+
+def cmd_callback(args):
+    if not os.path.exists(args.file):
+        print("No callback file yet.")
+        return
+    payload = json.load(open(args.file, encoding="utf-8"))
+    if args.json:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+    print(format_callback(payload))
+
+
+def cmd_bookmarklet(args):
+    if not os.path.exists(BOOKMARKLET_FILE):
+        print("Missing bookmarklet.js", file=sys.stderr)
+        sys.exit(1)
+    code = open(BOOKMARKLET_FILE, encoding="utf-8").read().strip()
+    print("Create a new bookmark. Use this text as the URL:\n")
+    print("javascript:" + code)
+    print("\nThen open the private area, log in, and click the bookmark.")
+
+
+def cmd_register(args):
+    if os.name != "nt":
+        print("Automatic registration is only for Windows.")
+        print("Register the scheme %s:// with your desktop environment." % CALLBACK_SCHEME)
+        return
+    import winreg
+    python = sys.executable
+    pythonw = os.path.join(os.path.dirname(python), "pythonw.exe")
+    if os.path.exists(pythonw):
+        python = pythonw
+    command = '"%s" "%s" receive "%%1"' % (python, os.path.abspath(__file__))
+    base = r"Software\Classes\%s" % CALLBACK_SCHEME
+    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, base) as key:
+        winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "URL:%s callback" % CALLBACK_SCHEME)
+        winreg.SetValueEx(key, "URL Protocol", 0, winreg.REG_SZ, "")
+    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, base + r"\shell\open\command") as key:
+        winreg.SetValueEx(key, "", 0, winreg.REG_SZ, command)
+    print("Registered %s:// ->" % CALLBACK_SCHEME)
+    print(" ", command)
+
+
 def cmd_status(args):
     client, account, supplies = load_context(args)
     print(json.dumps({"name": account["name"], "supplies": len(supplies),
@@ -494,6 +586,22 @@ def build_parser():
 
     login = sub.add_parser("login", help="open the login page and save the sid cookie")
     login.set_defaults(func=cmd_login)
+
+    book = sub.add_parser("bookmarklet", help="print the bookmarklet code")
+    book.set_defaults(func=cmd_bookmarklet)
+
+    register = sub.add_parser("register", help="register the edist:// protocol (Windows)")
+    register.set_defaults(func=cmd_register)
+
+    receive = sub.add_parser("receive", help="handle an edist:// callback (used by the protocol)")
+    receive.add_argument("url")
+    receive.add_argument("--out", default=DEFAULT_CALLBACK)
+    receive.set_defaults(func=cmd_receive)
+
+    callback = sub.add_parser("callback", help="show the last received callback")
+    callback.add_argument("--file", default=DEFAULT_CALLBACK)
+    callback.add_argument("--json", action="store_true")
+    callback.set_defaults(func=cmd_callback)
 
     sub.add_parser("status", help="account and supplies").set_defaults(func=cmd_status)
     sub.add_parser("cups", help="list supplies").set_defaults(func=cmd_cups)
