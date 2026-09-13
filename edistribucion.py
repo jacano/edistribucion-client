@@ -427,10 +427,17 @@ def parse_callback_url(url):
 
 
 def cmd_receive(args):
+    kind = (urllib.parse.urlsplit(args.url).netloc or "callback").lower()
     payload = parse_callback_url(args.url)
-    with open(args.out, "w", encoding="utf-8") as fh:
-        json.dump(payload, fh, ensure_ascii=False, indent=2)
-    print("Callback saved to", args.out)
+    if kind == "session":
+        session = Session(path=args.session)
+        session.cookies.update(payload.get("cookies", {}))
+        session.save()
+        print("Session saved to", args.session)
+    else:
+        with open(args.out, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, ensure_ascii=False, indent=2)
+        print("Callback saved to", args.out)
 
 
 def format_callback(payload):

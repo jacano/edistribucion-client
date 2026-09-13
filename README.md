@@ -88,6 +88,36 @@ protocol callback gets data from the page URL. The page cannot read an HttpOnly
 cookie. So the callback cannot carry the `sid`. That is why this step is
 manual.
 
+## Bridge extension
+
+This flow reads your session cookie and sends it to the tool. No bookmark. No
+copy-paste. This works because a browser extension may read HttpOnly cookies.
+
+1. Register the protocol. Windows only.
+
+```bash
+python edistribucion.py register
+```
+
+2. Load the extension:
+   - Open `chrome://extensions`.
+   - Turn on Developer mode.
+   - Click "Load unpacked".
+   - Select the `extension` folder in this repo.
+
+3. Open the private area and log in.
+4. Click the extension button in the toolbar.
+5. Chrome asks to open "e-distribucion bridge". Allow it. Check the box to
+   remember the choice.
+6. The tool saves the session. Now run any command, for example:
+
+```bash
+python edistribucion.py month --month 2026-09
+```
+
+The extension sends only the needed cookies: `sid`, `oid`, `sid_Client`,
+`inst`, `clientSrc`. The `sid` cookie is HttpOnly. An extension can read it.
+
 ## Bookmarklet callback
 
 This flow does not need the `sid` cookie. The page runs the query for you.
