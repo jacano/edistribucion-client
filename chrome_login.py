@@ -133,7 +133,15 @@ def capture_sid(user_data_dir=None, timeout=30):
     with open(port_file, encoding="utf-8") as fh:
         lines = [line.strip() for line in fh.read().splitlines() if line.strip()]
     ws_url = "ws://127.0.0.1:%s%s" % (lines[0], lines[1])
-    tools = DevTools(ws_url)
+    tools = None
+    for _ in range(5):
+        try:
+            tools = DevTools(ws_url)
+            break
+        except Exception:
+            time.sleep(2)
+    if tools is None:
+        raise RuntimeError("Could not connect to Chrome DevTools. Try again.")
     sid = None
     try:
         deadline = time.time() + timeout
