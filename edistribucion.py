@@ -897,6 +897,20 @@ def hours_days(hours):
     return "%d hours (%d days)" % (hours, round(hours / 24.0))
 
 
+def _print_kwh_table(title, key_label, rows, total):
+    """Print a table with a real column, an estimated column and a total."""
+    print(title)
+    print("    %-8s %11s %11s %11s" % (key_label, "real kWh", "est. kWh", "total kWh"))
+    for group in rows:
+        real = group["real_kwh"]
+        estimated = group["estimated_kwh"]
+        print("    %-8s %11.3f %11.3f %11.3f"
+              % (group["key"], real, estimated, real + estimated))
+    real, estimated = total
+    print("    %-8s %11.3f %11.3f %11.3f"
+          % ("Total", real, estimated, real + estimated))
+
+
 def _print_report(result):
     print("REPORT")
     print("CUPS:", result["cups"])
@@ -922,22 +936,47 @@ def _print_report(result):
         cells = "  ".join("%9.3f" % periods.get(name, 0.0) for name in names)
         print("  %-11s %10.3f %16s  %s" % (
             label, kwh, "%d h (%d d)" % (hours, round(hours / 24.0)), cells))
-    print("  By year (real | estimated kWh, real | estimated hours):")
+    print("  By year")
+    print("    %-7s %11s %11s %11s   %14s %14s"
+          % ("Year", "real kWh", "est. kWh", "total kWh", "real hours", "est. hours"))
     for group in result["consumption_by_year"]:
-        print("    %s  %10.3f | %10.3f  | %6d h (%3d d) | %6d h (%3d d)" % (
-            group["key"], group["real_kwh"], group["estimated_kwh"],
-            group["real_hours"], round(group["real_hours"] / 24.0),
-            group["estimated_hours"], round(group["estimated_hours"] / 24.0)))
-        for name, slot in result["periods_by_year"].get(group["key"], {}).items():
-            print("      %s  %8.3f | %8.3f" % (name, slot["real"], slot["estimated"]))
-    print("  By month (real | estimated kWh):")
-    for group in result["consumption_by_month"]:
-        print("    %s  %10.3f | %10.3f" % (
-            group["key"], group["real_kwh"], group["estimated_kwh"]))
-    print("  By hour of day (real | estimated kWh):")
-    for group in result["consumption_by_hour"]:
-        print("    %s  %10.3f | %10.3f" % (
-            group["key"], group["real_kwh"], group["estimated_kwh"]))
+        real = group["real_kwh"]
+        estimated = group["estimated_kwh"]
+        real_h = group["real_hours"]
+        estimated_h = group["estimated_hours"]
+        print("    %-7s %11.3f %11.3f %11.3f   %14s %14s"
+              % (group["key"], real, estimated, real + estimated,
+                 "%d h (%d d)" % (real_h, round(real_h / 24.0)),
+                 "%d h (%d d)" % (estimated_h, round(estimated_h / 24.0))))
+    real_h = result["real_hours"]
+    estimated_h = result["estimated_hours"]
+    print("    %-7s %11.3f %11.3f %11.3f   %14s %14s"
+          % ("Total", result["real_kwh"], result["estimated_kwh"],
+             result["real_kwh"] + result["estimated_kwh"],
+             "%d h (%d d)" % (real_h, round(real_h / 24.0)),
+             "%d h (%d d)" % (estimated_h, round(estimated_h / 24.0))))
+
+    print("  By year period")
+    header = "    %-7s" % "Year"
+    for name in names:
+        header += "  %10s %10s" % (name + " real", name + " est")
+    print(header)
+    for year, periods in sorted(result["periods_by_year"].items()):
+        line = "    %-7s" % year
+        for name in names:
+            slot = periods.get(name, {})
+            line += "  %10.3f %10.3f" % (slot.get("real", 0.0), slot.get("estimated", 0.0))
+        print(line)
+    line = "    %-7s" % "Total"
+    for name in names:
+        line += "  %10.3f %10.3f" % (result["periods_real_kwh"].get(name, 0.0),
+                                     result["periods_estimated_kwh"].get(name, 0.0))
+    print(line)
+
+    _print_kwh_table("  By month", "Month", result["consumption_by_month"],
+                     (result["real_kwh"], result["estimated_kwh"]))
+    _print_kwh_table("  By hour of day", "Hour", result["consumption_by_hour"],
+                     (result["real_kwh"], result["estimated_kwh"]))
     print()
     print("MAXIMUM PER YEAR")
     print("  %-4s  %10s  %-20s  %11s  %s"

@@ -85,15 +85,23 @@ CONSUMPTION
   Real          5797.068  15911 h (663 d)   1890.900   1704.064   2202.104
   Estimated     2742.983   7438 h (310 d)    810.040    657.056   1275.887
   Total         8540.051  23349 h (973 d)   2700.940   2361.120   3477.991
-  By year (real | estimated kWh, real | estimated hours):
-    2024    2007.797 |    595.522  |   6265 h (261 d) |   2158 h ( 90 d)
-      P1   606.608 |  165.083
-      P2   596.359 |  182.676
-      P3   804.830 |  247.763
-    2025    2613.067 |    912.146  |   5837 h (243 d) |   2922 h (122 d)
-      ...
-  By month (real | estimated kWh):
-    2024-03      11.335 |    225.417
+  By year
+    Year       real kWh    est. kWh   total kWh       real hours     est. hours
+    2024       2007.797     595.522    2603.319   6265 h (261 d)  2158 h (90 d)
+    2025       2613.067     912.146    3525.213   5837 h (243 d) 2922 h (122 d)
+    Total      5797.068    2742.983    8540.051   15911 h (663 d) 7438 h (310 d)
+  By year period
+    Year        P1 real     P1 est     P2 real     P2 est     P3 real     P3 est
+    2024        606.608    165.083     596.359    182.676     804.830    247.763
+    ...
+    Total      1890.900    810.040    1704.064    657.056    2202.104   1275.887
+  By month
+    Month       real kWh    est. kWh   total kWh
+    2024-03       11.335     225.417     236.752
+    ...
+  By hour of day
+    Hour        real kWh    est. kWh   total kWh
+    00           215.885     117.451     333.336
     ...
 
 MAXIMUM PER YEAR
