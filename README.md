@@ -31,8 +31,6 @@ POST requests to `/s/sfsites/aura`.
 Get the session with one of these commands. Full steps are in
 [AUTHENTICATION.md](AUTHENTICATION.md).
 
-- `login` reads the session from your running Chrome with the DevTools Protocol.
-  Turn on remote debugging one time in `chrome://inspect/#remote-debugging`.
 - `login-backend` logs in with the user and the password. No browser. Add
   `--save` to store the credentials encrypted with the Windows DPAPI. Then the
   tool logs in again when the session expires.
@@ -40,7 +38,7 @@ Get the session with one of these commands. Full steps are in
 - `save --sid` stores a value that you already have.
 
 ```bash
-python edistribucion.py login
+python edistribucion.py login-backend
 ```
 
 ## Commands

@@ -1,41 +1,9 @@
 # Authentication
 
-The session is the `sid` cookie. The tool needs that value. There are four ways
-to give it. All of them write the file `sesion.json`.
+The session is the `sid` cookie. The tool needs that value. There are three
+ways to give it. All of them write the file `sesion.json`.
 
-## `login` (recommended)
-
-This command opens the portal and reads the session from your running Chrome
-with the DevTools Protocol. It uses your normal Chrome. You do not set any port
-or flag, and no new browser opens. The DevTools Protocol sees HttpOnly cookies,
-so no code injection is needed.
-
-Turn on remote debugging one time in Chrome:
-
-1. Open `chrome://inspect/#remote-debugging`.
-2. Turn on Remote debugging.
-
-Use:
-
-1. Run the command.
-
-```bash
-python edistribucion.py login
-```
-
-2. The portal opens. Log in if needed.
-3. If Chrome asks for permission, click Allow.
-4. The tool reads the `sid` cookie and writes `sesion.json`.
-
-Options:
-
-- `--profile-dir PATH` points to another Chrome user data directory.
-- `--timeout SECONDS` changes the wait. The default is 180.
-
-How it works: Chrome writes `DevToolsActivePort` in its user data directory. The
-tool reads that file, connects to Chrome, and calls `Storage.getCookies`.
-
-## `login-backend`
+## `login-backend` (recommended)
 
 This command logs in with the portal login call. No browser.
 
@@ -64,6 +32,11 @@ Stored session expired. Logged in again with the stored credentials.
 
 To turn auto login off, delete `credenciales.json`.
 
+How it works: the tool calls the portal login action. The response holds the
+frontdoor URL with a pre-session. The tool follows the chain (frontdoor, login
+flow, landing page, home). The home page then sets the `sid` cookie and the
+`aura.token` cookie.
+
 ## `import-cookies`
 
 This command reads a `cookies.txt` file (the Netscape format) or a JSON export.
@@ -81,10 +54,14 @@ python edistribucion.py import-cookies
 python edistribucion.py import-cookies cookies.txt
 ```
 
+Export the file right before the import. Each new login can end the previous
+session, so an old file may hold a dead session.
+
 ## `save`
 
 This command stores a value that you already have. It is used by an agent or by
-hand.
+hand. You can read the value from the `Cookie` header of a portal request, or
+from the browser cookie panel.
 
 ```bash
 python edistribucion.py save --sid "<sid value>"
@@ -98,7 +75,8 @@ python edistribucion.py save --text "renderCtx=x; sid=00D...!AQEA...; oid=00D"
 
 ## Notes
 
-- The `sid` cookie is HttpOnly. A web page cannot read it. The DevTools
-  Protocol, an extension, or the portal itself can read it.
+- The `sid` cookie is HttpOnly. A web page cannot read it. The portal itself, or
+  the browser cookie panel, can read it.
 - Do not share `sesion.json` or `credenciales.json`.
-- When the session expires, run `login` again, or let the auto login do it.
+- When the session expires, run `login-backend` again, or let the auto login do
+  it.

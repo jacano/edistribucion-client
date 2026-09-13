@@ -14,7 +14,6 @@ How it works (Salesforce Experience Cloud / Aura):
     message / aura.context / aura.pageURI / aura.token.
 
 Session: sesion.json (or the EDIST_SID environment variable). Commands:
-  python edistribucion.py login                  # read the session from Chrome
   python edistribucion.py login-backend [--save] # log in with user and password
   python edistribucion.py import-cookies FILE    # import a cookies.txt
   python edistribucion.py save --sid "<value>"   # save a value by hand
@@ -36,7 +35,6 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-import webbrowser
 from ctypes import wintypes
 from datetime import date, datetime, timedelta
 
@@ -642,31 +640,6 @@ def extract_cookies_from_text(text):
     return found
 
 
-def cmd_login(args):
-    from chrome_login import capture_sid
-    print("Opening the portal login page in your browser...")
-    webbrowser.open(BASE + LOGIN_PAGE)
-    print("Log in. Then the tool reads the session from Chrome.")
-    print("Chrome needs remote debugging on: chrome://inspect/#remote-debugging")
-    try:
-        sid = capture_sid(user_data_dir=args.profile_dir, timeout=args.timeout)
-    except Exception as exc:
-        print(str(exc), file=sys.stderr)
-        sys.exit(1)
-    if not sid:
-        print("No session found. Log in to the portal and run login again.", file=sys.stderr)
-        sys.exit(1)
-    session = Session(sid=sid, path=args.session)
-    session.save()
-    print("Session saved to", args.session)
-    try:
-        account = Client(session).whoami()
-        print("Login OK. User:", account["name"])
-    except Exception as exc:
-        print("Session saved, but the check failed:", exc, file=sys.stderr)
-        sys.exit(1)
-
-
 def cmd_login_backend(args):
     username = args.user
     password = args.password
@@ -783,12 +756,6 @@ def build_parser():
                          help="import cookies from a cookies.txt (Netscape) or JSON file")
     imp.add_argument("file", nargs="?", help="path to cookies.txt or JSON export (default: newest in Downloads)")
     imp.set_defaults(func=cmd_import_cookies)
-
-    login = sub.add_parser("login", parents=[common],
-                           help="open the portal and read the session from Chrome")
-    login.add_argument("--profile-dir", help="Chrome user data dir")
-    login.add_argument("--timeout", type=int, default=180)
-    login.set_defaults(func=cmd_login)
 
     backend = sub.add_parser("login-backend", parents=[common],
                              help="log in with user and password, no browser")
