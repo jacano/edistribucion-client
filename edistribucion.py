@@ -16,8 +16,6 @@ How it works (Salesforce Experience Cloud / Aura):
 Session: sesion.json (or the EDIST_SID environment variable). Commands:
   python edistribucion.py login
   python edistribucion.py save --sid "<sid cookie value>"
-  python edistribucion.py js            # print the snippet for the DevTools console
-  python edistribucion.py paste         # format the result copied from the console
   python edistribucion.py status
   python edistribucion.py cups
   python edistribucion.py periods [--cont <contId>]
@@ -45,7 +43,6 @@ DETAIL_PAGE = "/areaprivada/s/wp-measure-detail-v4"
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_SESSION = os.path.join(DIR, "sesion.json")
-CONSOLE_FILE = os.path.join(DIR, "console.js")
 USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36")
 
@@ -439,8 +436,9 @@ def cmd_login(args):
             sys.exit(1)
         session.cookies.update(cookies)
     elif method == "3":
-        print("Ask the agent: 'save my e-distribucion session'.")
-        print("The agent uses the Chrome MCP and calls the tool edist_save_session.")
+        print("Ask the agent: 'capture my e-distribucion session'.")
+        print("The agent reads the Cookie header with the Chrome DevTools MCP,")
+        print("then runs:  python edistribucion.py save --sid \"<sid value>\"")
         return
     else:
         print("Unknown method:", method, file=sys.stderr)
@@ -454,56 +452,6 @@ def cmd_login(args):
     except Exception as exc:
         print("Session saved, but the check failed:", exc, file=sys.stderr)
         sys.exit(1)
-
-
-def format_result(payload):
-    if payload.get("mode") == "status":
-        lines = ["Supplies:"]
-        for item in payload.get("supplies", []):
-            lines.append("  %-14s %s  %s -> %s  power=%s kW" % (
-                item.get("contract_id"), item.get("cups"), item.get("start"),
-                item.get("end") or "(open)", item.get("power_kw")))
-        return "\n".join(lines)
-    lines = [
-        "CUPS: %s | contractId: %s" % (payload.get("cups"), payload.get("contract_id")),
-        "Range: %s -> %s" % (payload.get("from"), payload.get("to")),
-        "Total: %s kWh | peak demand: %s kW" % (
-            payload.get("total_kwh"), payload.get("peak_demand_kw")),
-        "Periods (kWh): %s" % (payload.get("periods_kwh"),),
-        "Measured: %s kWh (%s h) | Estimated: %s kWh (%s h)" % (
-            payload.get("measured_kwh"), payload.get("measured_hours"),
-            payload.get("estimated_kwh"), payload.get("estimated_hours")),
-        "Daily detail:",
-    ]
-    for day in payload.get("days", []):
-        lines.append("  %s  %8.3f kWh  %-9s %s" % (
-            day["date"], day["kwh"], KIND_LABELS.get(day.get("kind"), ""), day.get("periods")))
-    return "\n".join(lines)
-
-
-def cmd_js(args):
-    if not os.path.exists(CONSOLE_FILE):
-        print("Missing console.js", file=sys.stderr)
-        sys.exit(1)
-    print("Steps:")
-    print("1. Open the portal in Chrome and log in.")
-    print("2. Open DevTools and select the Console tab.")
-    print("3. Paste the code below. Press Enter.")
-    print("4. Answer the prompt. The result goes to your clipboard.")
-    print("5. Run: python edistribucion.py paste")
-    print("6. Paste the result. Press Enter, then Ctrl+Z, then Enter.")
-    print()
-    print(open(CONSOLE_FILE, encoding="utf-8").read())
-
-
-def cmd_paste(args):
-    if args.file:
-        text = open(args.file, encoding="utf-8").read()
-    else:
-        print("Paste the result. Press Enter, then Ctrl+Z, then Enter.", file=sys.stderr)
-        text = sys.stdin.read()
-    payload = json.loads(text)
-    print(format_result(payload))
 
 
 def cmd_status(args):
@@ -599,15 +547,6 @@ def build_parser():
     login.add_argument("--method", choices=["1", "2", "3"],
                        help="1 paste, 2 cookies file, 3 agent")
     login.set_defaults(func=cmd_login)
-
-    js = sub.add_parser("js", parents=[common],
-                        help="print the snippet to run in the Chrome DevTools console")
-    js.set_defaults(func=cmd_js)
-
-    paste = sub.add_parser("paste", parents=[common],
-                           help="format the result copied from the DevTools console")
-    paste.add_argument("--file")
-    paste.set_defaults(func=cmd_paste)
 
     sub.add_parser("status", parents=[common],
                    help="account and supplies").set_defaults(func=cmd_status)

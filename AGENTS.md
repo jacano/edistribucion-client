@@ -76,8 +76,6 @@ Use these commands. Do not guess new ones.
 | `python edistribucion.py month --month YYYY-MM` | consumption for one month |
 | `python edistribucion.py range --from YYYY-MM-DD --to YYYY-MM-DD` | consumption for a range |
 | `python edistribucion.py login` | open the login page and save the session |
-| `python edistribucion.py js` | print the snippet for the DevTools console |
-| `python edistribucion.py paste` | format the result copied from the console |
 
 Add `--json` to `month` or `range` to get raw JSON. Use `--json` when you need
 the data for more work.
@@ -86,22 +84,6 @@ Add `--cont <contractId>` to pick a supply. Without it, the tool uses the open
 contract. The command `cups` shows each `contract_id`.
 
 The options `--sid` and `--session` go before or after the command.
-
-## Fallback without a session
-
-Use this when the user cannot save the session.
-
-1. Run `python edistribucion.py js`. Show the code and the steps to the user.
-2. The user opens the portal, logs in, and opens the DevTools console.
-3. The user pastes the code. It asks for `status`, `month`, or `range`.
-4. The result goes to the user clipboard. The user pastes it into the tool with
-   `python edistribucion.py paste`.
-
-The pasted result has the fields `periods_kwh`, `measured_kwh`,
-`estimated_kwh`, and `days`. Use it the same way as the normal output.
-
-The console snippet cannot read the `sid` cookie, because it is HttpOnly. So
-this method returns the data, not the session. Use it per query.
 
 ## What the output means
 
