@@ -45,6 +45,7 @@ LOGIN_PAGE = "/areaprivada/s/login/"
 MEASURELIST_PAGE = "/areaprivada/s/wp-measurelist-v4"
 DETAIL_PAGE = "/areaprivada/s/wp-measure-detail-v4"
 MAXPOWER_PAGE = "/areaprivada/s/wp-maximeterhistogramdetail"
+ATR_PAGE = "/areaprivada/s/wp-atrcontractdetail"
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_SESSION = os.path.join(DIR, "session.json")
@@ -74,6 +75,9 @@ ACTIONS = {
     "maximeter": ("WP_MaximeterHistogram_CTRL.getHistogramPoints",
                   "apex://WP_MaximeterHistogram_CTRL/ACTION$getHistogramPoints",
                   "markup://c:WP_MaximeterHistogramDetail"),
+    "atr_detail": ("WP_ContractATRDetail_CTRL.getATRDetail",
+                   "apex://WP_ContractATRDetail_CTRL/ACTION$getATRDetail",
+                   "markup://c:WP_SuppliesATRDetailForm"),
 }
 
 METHODS = {"R": "measured", "E": "estimated", "C": "calculated"}
@@ -373,6 +377,23 @@ class Client:
                                 "id": cups_id, "sIdentificador": visibility_id}}
         return self.call("maximeter", params, page).get("data", {})
 
+    def get_contracted_power(self, contract_id, visibility_id):
+        """Return the contracted power per period, for example {"P1": 4.0, "P2": 4.0}."""
+        page = "%s?atrid=%s&vis=%s" % (ATR_PAGE, contract_id, visibility_id)
+        params = {"atrId": contract_id, "visSelected": visibility_id}
+        rows = self.call("atr_detail", params, page).get("data", [])
+        power = {}
+        for row in rows:
+            title = row.get("title") or ""
+            value = row.get("value")
+            if title.startswith("Potencia contratada") and value:
+                number = title.replace("Potencia contratada", "").strip().split(" ")[0]
+                try:
+                    power["P" + number] = float(str(value).replace(",", "."))
+                except ValueError:
+                    pass
+        return power
+
 
 # ---------------------------------------------------------------- parsing
 def parse_curve(data):
@@ -620,7 +641,11 @@ def resolve_cups(supplies, requested):
 
 
 def cmd_cups(args):
-    _, _, supplies = load_context(args)
+    client, account, supplies = load_context(args)
+    for item in supplies:
+        power = client.get_contracted_power(item["contract_id"], account["visibility_id"])
+        if power:
+            item["contracted_power_kw"] = power
     print(json.dumps(supplies, ensure_ascii=False, indent=2))
 
 
@@ -662,6 +687,7 @@ def cmd_consume(args):
     supplies = [item for item in all_supplies if item["cups"] == cups]
     contracts = supplies
     current = next((item for item in supplies if not item.get("end")), supplies[-1])
+    contracted = client.get_contracted_power(current["contract_id"], account["visibility_id"])
 
     ranges = []
     for item in contracts:
@@ -732,7 +758,7 @@ def cmd_consume(args):
         })
     result = {
         "cups": cups,
-        "contracted_power_kw": current.get("contracted_power_kw"),
+        "contracted_power_kw": contracted,
         "from": first.isoformat() if first else None,
         "to": last.isoformat() if last else None,
         "group": args.group,
@@ -773,6 +799,7 @@ def cmd_maxpower(args):
     if not cups_id:
         print("No CUPS id for the contract.", file=sys.stderr)
         sys.exit(1)
+    contracted = client.get_contracted_power(current["contract_id"], account["visibility_id"])
 
     if args.date_to:
         year, month = [int(part) for part in args.date_to.split("-")[:2]]
@@ -790,11 +817,11 @@ def cmd_maxpower(args):
     data = client.get_maximeter(cups_id, account["visibility_id"], start, end)
     if args.json:
         data = dict(data)
-        data["contracted_power_kw"] = current.get("contracted_power_kw")
+        data["contracted_power_kw"] = contracted
         print(json.dumps(data, ensure_ascii=False, indent=2))
         return
 
-    print("CUPS:", data.get("cups"), "| contracted power:", data.get("requestedPower"), "kW")
+    print("CUPS:", data.get("cups"), "| contracted power:", contracted, "kW")
     print("Period:", start, "->", end)
     print("Maximum:", data.get("maxValue"))
     print("Monthly maxima:")

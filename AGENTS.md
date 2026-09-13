@@ -34,7 +34,7 @@ Use these commands. Do not guess new ones.
 
 | command | what it does |
 | --------- | ------------ |
-| `python edistribucion.py cups` | list supplies, with the contracted power and the CUPS id |
+| `python edistribucion.py cups` | list supplies, with the CUPS id and the contracted power per period |
 | `python edistribucion.py consume --group month` | aggregate consumption by hour, day, month, or year |
 | `python edistribucion.py maxpower` | maximum demanded power per month |
 | `python edistribucion.py login-backend` | log in with user and password, no browser |
@@ -64,7 +64,7 @@ The output has these keys:
 | `from`, `to` | the real period used |
 | `group` | the group used |
 | `cups` | the CUPS used |
-| `contracted_power_kw` | the contracted power of the supply |
+| `contracted_power_kw` | the contracted power per period, for example `{"P1": 4.0, "P2": 4.0}` |
 | `real_kwh` | total measured consumption |
 | `estimated_kwh` | total estimated consumption |
 | `real_hours`, `estimated_hours` | count of measured and estimated hours |

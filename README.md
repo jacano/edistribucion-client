@@ -41,7 +41,7 @@ python edistribucion.py login-backend
 ## Commands
 
 ```bash
-# List supplies. Shows the CUPS id and the contracted power.
+# List supplies. Shows the CUPS id and the contracted power per period (P1, P2).
 python edistribucion.py cups
 
 # Aggregate consumption by month (default).
@@ -70,7 +70,7 @@ The options `--sid` and `--session` go before or after the command.
 Example output:
 
 ```
-CUPS: ES0031102226226018WR0F | contracted power: {'P1': 4.0} kW
+CUPS: ES0031102226226018WR0F | contracted power: {'P1': 4.0, 'P2': 4.0} kW
 Period: 2024-01-16 -> 2026-09-12 | group: month
 Real: 5797.054 kWh (15911 h) | Estimated: 2743.035 kWh (7390 h)
 Real periods: {'P1': 1890.896, 'P2': 1704.069, 'P3': 2202.089}
