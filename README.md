@@ -4,9 +4,7 @@ This tool reads your electricity consumption from the e-distribucion private
 area (Endesa group). It uses HTTP only. It runs in the terminal. It also works
 as an MCP server for agents.
 
-The client uses HTTP only. It uses only the Python standard library. One
-optional command opens your browser to the login page. The client never
-controls the browser.
+The client uses only the Python standard library.
 
 Warning: this tool is not official. It is not connected to e-distribucion or
 Endesa. Use it only with your own account. The portal can change at any time.
@@ -27,189 +25,18 @@ POST requests to `/s/sfsites/aura`.
 ## Requirements
 
 - Python 3.9 or newer.
-- Optional, for `login-proxy`: the `cryptography` package
-  (`pip install cryptography`).
 
-## Setup
+## Authentication
 
-1. Open `https://zonaprivada.edistribucion.com/areaprivada/s/` in your browser.
-2. Log in.
-3. Copy the `sid` cookie value. In DevTools, open Application, then Cookies,
-   then `zonaprivada.edistribucion.com`, then `sid`.
-4. Save the value:
+The tool supports three ways to get the session. The full steps are in
+[AUTHENTICATION.md](AUTHENTICATION.md).
 
-```bash
-python edistribucion.py save --sid "<sid cookie value>"
-```
-
-You can also put the value in the environment variable `EDIST_SID`.
-
-## Easier way to get the sid
-
-You can use the browser extension "Get cookies.txt LOCALLY" to export the
-cookies. Link:
-
-https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc
-
-Steps:
-
-1. Log in to the portal.
-2. Open the extension on the portal page.
-3. Export the cookies for this site. Save the file.
-4. Import the file:
-
-```bash
-python edistribucion.py import-cookies cookies.txt
-```
-
-The command reads the `sid` cookie and saves it to `sesion.json`. The command
-also accepts a JSON export.
-
-## Login command
-
-The command `login` opens the login page in your browser. Then it asks for the
-`sid` value.
-
-```bash
-python edistribucion.py login
-```
-
-Steps:
-
-1. Run the command. Your browser opens the login page.
-2. Log in.
-3. Open DevTools. Select Application, then Cookies.
-4. Select `zonaprivada.edistribucion.com`.
-5. Copy the value of `sid`.
-6. Paste the value in the terminal.
-
-The command saves the value and checks the session.
-
-The `sid` cookie is HttpOnly. The browser hides it from scripts. A custom
-protocol callback gets data from the page URL. The page cannot read an HttpOnly
-cookie. So the callback cannot carry the `sid`. That is why this step is
-manual.
-
-## DevTools login (agent)
-
-This flow uses your normal Chrome with the `chrome-devtools` MCP. No extension,
-no bookmark, no proxy. The agent reads the `sid` value and sends it to our app.
-
-1. Log in to the portal in Chrome.
-2. Ask the agent: "save my e-distribucion session".
-3. The agent reads the `sid` value with the Chrome DevTools MCP. It reads the
-   `Cookie` header of a portal request.
-4. The agent calls the tool `edist_save_session` with the value.
-5. The tool saves the session. Later commands use plain HTTP.
-
-Turn on remote debugging once:
-
-- Open `chrome://inspect/#remote-debugging`.
-- Turn on Remote Debugging.
-- When the agent connects, Chrome asks for permission. Click Allow.
-
-## Proxy login
-
-This flow captures the session without an extension and without a bookmark. It
-uses your normal Chrome profile. So it keeps your settings and your logins.
-
-Chrome allows one instance per profile. Close Chrome first, or use `--force`.
-
-1. Install the optional dependency.
-
-```bash
-pip install cryptography
-```
-
-2. Close Chrome.
-3. Run the command.
-
-```bash
-python edistribucion.py login-proxy
-```
-
-Add `--force` to let the tool close Chrome for you:
-
-```bash
-python edistribucion.py login-proxy --force
-```
-
-4. Chrome opens with your normal profile, through the proxy.
-5. Log in to the portal.
-6. The tool reads the `sid` cookie, saves it, and reopens Chrome without the
-   proxy.
-
-Only the login goes through the proxy. Later commands use plain HTTP with the
-saved cookie.
-
-If the login page does not load, trust the printed `ca.crt` file. Then run the
-command again. The proxy uses HTTP/1.1 so the headers stay readable.
-
-## Bridge extension
-
-This flow reads your session cookie and sends it to the tool. No bookmark. No
-copy-paste. This works because a browser extension may read HttpOnly cookies.
-
-1. Register the protocol. Windows only.
-
-```bash
-python edistribucion.py register
-```
-
-2. Load the extension:
-   - Open `chrome://extensions`.
-   - Turn on Developer mode.
-   - Click "Load unpacked".
-   - Select the `extension` folder in this repo.
-
-3. Open the private area and log in.
-4. Click the extension button in the toolbar.
-5. Chrome asks to open "e-distribucion bridge". Allow it. Check the box to
-   remember the choice.
-6. The tool saves the session. Now run any command, for example:
-
-```bash
-python edistribucion.py month --month 2026-09
-```
-
-The extension sends only the needed cookies: `sid`, `oid`, `sid_Client`,
-`inst`, `clientSrc`. The `sid` cookie is HttpOnly. An extension can read it.
-
-## Bookmarklet callback
-
-This flow does not need the `sid` cookie. The page runs the query for you.
-
-1. Register the protocol. Windows only.
-
-```bash
-python edistribucion.py register
-```
-
-2. Print the bookmarklet code.
-
-```bash
-python edistribucion.py bookmarklet
-```
-
-3. Create a bookmark in your browser. Use the printed text as the URL.
-4. Open the private area and log in.
-5. Click the bookmark and answer the prompt. Example answers:
-   - `status`
-   - `month 2026-09`
-   - `range 2026-09-01 2026-09-30`
-6. The page sends the result to the tool. The tool saves the result in
-   `callback.json`.
-7. Show the result.
-
-```bash
-python edistribucion.py callback
-```
-
-The agent uses the tool `edist_read_callback` to read the same file.
-
-This flow runs one query per click, and you must be logged in. The flow with
-`sesion.json` runs without you. Use the bookmarklet flow when the session is
-hard to copy.
+1. Import a cookies file. Export `cookies.txt` with a browser extension, then
+   run `import-cookies`.
+2. Pass the session as an argument. Use the `--sid` option or the `save`
+   command.
+3. Use the MCP. The agent reads the `sid` with the Chrome DevTools MCP, then
+   calls the tool `edist_save_session`.
 
 ## Commands
 
@@ -232,6 +59,8 @@ python edistribucion.py range --from 2026-09-01 --to 2026-09-30
 # JSON output.
 python edistribucion.py month --month 2026-09 --json
 ```
+
+The options `--sid` and `--session` go before or after the command.
 
 Example output:
 
@@ -286,6 +115,7 @@ Tools:
 
 | tool                      | description                                          |
 | ------------------------- | ---------------------------------------------------- |
+| `edist_save_session`      | save the session cookie (used for the MCP login)     |
 | `edist_status`            | account and supplies with contracted power           |
 | `edist_supplies`          | full supply list                                     |
 | `edist_periods`           | billing periods, contracts, and available range      |
@@ -297,7 +127,8 @@ The server reads the session from `EDIST_SID` or from `sesion.json`.
 ## Session
 
 The `sid` session ends after some time. If a command fails with an
-authentication error, copy a new `sid` and run `save` again.
+authentication error, get a new `sid`. See
+[AUTHENTICATION.md](AUTHENTICATION.md).
 
 The client refreshes the `aura.token` on each call. The token lives about 60
 seconds.
