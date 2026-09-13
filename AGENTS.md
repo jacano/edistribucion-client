@@ -35,8 +35,8 @@ Use these commands. Do not guess new ones.
 | command | what it does |
 | --------- | ------------ |
 | `python edistribucion.py cups` | list supplies, with the contracted power and the CUPS id |
-| `python edistribucion.py consume --cups <CUPS> --group month` | aggregate consumption by hour, day, month, or year |
-| `python edistribucion.py maxpower --cups <CUPS>` | maximum demanded power per month |
+| `python edistribucion.py consume --group month` | aggregate consumption by hour, day, month, or year |
+| `python edistribucion.py maxpower` | maximum demanded power per month |
 | `python edistribucion.py login-backend` | log in with user and password, no browser |
 | `python edistribucion.py import-cookies` | import a cookies.txt |
 | `python edistribucion.py save --sid` | store a session value by hand |
@@ -49,7 +49,8 @@ The options `--sid` and `--session` go before or after the command.
 python edistribucion.py consume --cups ES0031102226226018WR0F --from 2024-01-16 --to 2026-09-12 --group month
 ```
 
-- `--cups` is required. Run `cups` to list the CUPS values.
+- `--cups` is only needed when the account has several CUPS. With one CUPS, the
+  tool picks it. Run `cups` to list the CUPS values.
 - `--group` is `hour`, `day`, `month`, or `year`. The default is `day`.
 - `hour` groups by hour of the day (00 to 23).
 - `--from` and `--to` are `YYYY-MM-DD`. Without them, it covers the full
@@ -80,7 +81,8 @@ Each request covers up to 35 days. The tool walks the history in 35-day steps.
 python edistribucion.py maxpower --cups ES0031102226226018WR0F
 ```
 
-- `--cups` is required. Run `cups` to list the CUPS values.
+- `--cups` is only needed when the account has several CUPS. With one CUPS, the
+  tool picks it. Run `cups` to list the CUPS values.
 - `--from` and `--to` are `YYYY-MM`. The default is the last 12 months.
 - `--json` gives raw JSON.
 

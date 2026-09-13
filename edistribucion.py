@@ -603,6 +603,22 @@ def cmd_login_backend(args):
         sys.exit(1)
 
 
+def resolve_cups(supplies, requested):
+    """Return the CUPS to use. Pick the only one, or ask for --cups."""
+    names = sorted({item["cups"] for item in supplies if item["cups"]})
+    if requested:
+        if requested not in names:
+            print("Unknown CUPS:", requested, file=sys.stderr)
+            print("Available:", ", ".join(names), file=sys.stderr)
+            sys.exit(1)
+        return requested
+    if len(names) == 1:
+        return names[0]
+    print("Several CUPS found. Pick one with --cups:", file=sys.stderr)
+    print("  " + ", ".join(names), file=sys.stderr)
+    sys.exit(1)
+
+
 def cmd_cups(args):
     _, _, supplies = load_context(args)
     print(json.dumps(supplies, ensure_ascii=False, indent=2))
@@ -644,11 +660,8 @@ def _compress_dates(days):
 
 def cmd_consume(args):
     client, account, all_supplies = load_context(args)
-    supplies = [item for item in all_supplies if item["cups"] == args.cups]
-    if not supplies:
-        print("Unknown CUPS:", args.cups, file=sys.stderr)
-        print("Run `cups` to list the CUPS values.", file=sys.stderr)
-        sys.exit(1)
+    cups = resolve_cups(all_supplies, args.cups)
+    supplies = [item for item in all_supplies if item["cups"] == cups]
     contracts = supplies
     if args.cont:
         contracts = [item for item in supplies if item["contract_id"] == args.cont]
@@ -725,7 +738,7 @@ def cmd_consume(args):
             "estimated_hours": value["estimated_hours"],
         })
     result = {
-        "cups": args.cups,
+        "cups": cups,
         "contracted_power_kw": current.get("contracted_power_kw"),
         "from": first.isoformat() if first else None,
         "to": last.isoformat() if last else None,
@@ -760,11 +773,8 @@ def cmd_consume(args):
 
 def cmd_maxpower(args):
     client, account, all_supplies = load_context(args)
-    supplies = [item for item in all_supplies if item["cups"] == args.cups]
-    if not supplies:
-        print("Unknown CUPS:", args.cups, file=sys.stderr)
-        print("Run `cups` to list the CUPS values.", file=sys.stderr)
-        sys.exit(1)
+    cups = resolve_cups(all_supplies, args.cups)
+    supplies = [item for item in all_supplies if item["cups"] == cups]
     current = next((item for item in supplies if not item.get("end")), supplies[-1])
     cups_id = current.get("cups_id")
     if not cups_id:
@@ -839,7 +849,7 @@ def build_parser():
 
     consume = sub.add_parser("consume", parents=[common],
                              help="aggregate consumption by hour, day, month or year")
-    consume.add_argument("--cups", required=True, help="the CUPS to aggregate (see `cups`)")
+    consume.add_argument("--cups", help="the CUPS to aggregate (only needed with several)")
     consume.add_argument("--from", dest="date_from", help="YYYY-MM-DD")
     consume.add_argument("--to", dest="date_to", help="YYYY-MM-DD")
     consume.add_argument("--group", choices=["hour", "day", "month", "year"],
@@ -850,7 +860,7 @@ def build_parser():
 
     mp = sub.add_parser("maxpower", parents=[common],
                         help="maximum demanded power per month")
-    mp.add_argument("--cups", required=True, help="the CUPS to query (see `cups`)")
+    mp.add_argument("--cups", help="the CUPS to query (only needed with several)")
     mp.add_argument("--from", dest="date_from", help="YYYY-MM")
     mp.add_argument("--to", dest="date_to", help="YYYY-MM")
     mp.add_argument("--json", action="store_true")

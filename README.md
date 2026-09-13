@@ -44,23 +44,26 @@ python edistribucion.py login-backend
 # List supplies. Shows the CUPS id and the contracted power.
 python edistribucion.py cups
 
-# Aggregate consumption by day (default). The CUPS is required.
-python edistribucion.py consume --cups ES0031102226226018WR0F
+# Aggregate consumption by day (default).
+python edistribucion.py consume
 
 # Aggregate by hour of the day, month, or year.
-python edistribucion.py consume --cups ES0031102226226018WR0F --group hour
-python edistribucion.py consume --cups ES0031102226226018WR0F --group month
-python edistribucion.py consume --cups ES0031102226226018WR0F --group year
+python edistribucion.py consume --group hour
+python edistribucion.py consume --group month
+python edistribucion.py consume --group year
 
 # Limit the period.
-python edistribucion.py consume --cups ES0031102226226018WR0F --from 2024-01-16 --to 2026-09-12 --group month
+python edistribucion.py consume --from 2024-01-16 --to 2026-09-12 --group month
 
-# Maximum demanded power per month. The CUPS is required.
-python edistribucion.py maxpower --cups ES0031102226226018WR0F
+# Maximum demanded power per month.
+python edistribucion.py maxpower
 
 # JSON output.
-python edistribucion.py consume --cups ES0031102226226018WR0F --group year --json
+python edistribucion.py consume --group year --json
 ```
+
+Add `--cups <value>` only when the account has several CUPS. With one CUPS, the
+tool picks it. The command `cups` lists the values.
 
 The options `--sid` and `--session` go before or after the command.
 
