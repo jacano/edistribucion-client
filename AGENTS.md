@@ -38,7 +38,6 @@ Use these commands. Do not guess new ones.
 | `python edistribucion.py consume --group month` | aggregate consumption by hour, day, month, or year |
 | `python edistribucion.py maxpower` | maximum demanded power per month |
 | `python edistribucion.py report` | full report: real consumption and power for a CUPS |
-| `python edistribucion.py days` | real days and consumption per period for a CUPS |
 | `python edistribucion.py login-backend` | log in with user and password, no browser |
 | `python edistribucion.py import-cookies` | import a cookies.txt |
 | `python edistribucion.py save --sid` | store a session value by hand |
@@ -115,21 +114,6 @@ This is the full report for one CUPS. It contains:
 
 Options: `--cups` (only needed with several CUPS), `--from YYYY-MM-DD`,
 `--to YYYY-MM-DD`, `--json`.
-
-## days
-
-```bash
-python edistribucion.py days
-```
-
-This answers: how many real days and how much real consumption, per period.
-
-- `real_days` is the count of days with at least one measured hour.
-- `periods` has one entry per `P1`, `P2`, `P3`, with `days`, `hours`, and `kwh`.
-- A day counts in a period when that period has at least one measured hour.
-- Estimated data is excluded. The output shows the excluded estimate.
-
-Options: `--cups`, `--from YYYY-MM-DD`, `--to YYYY-MM-DD`, `--json`.
 
 ## Rules for your answer
 

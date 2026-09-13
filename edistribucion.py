@@ -22,7 +22,6 @@ Session: session.json (or the EDIST_SID environment variable). Commands:
                                   [--group hour|month|year] [--json]
   python edistribucion.py maxpower [--cups <CUPS>] [--from YYYY-MM] [--to YYYY-MM] [--json]
   python edistribucion.py report [--cups <CUPS>] [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--json]
-  python edistribucion.py days [--cups <CUPS>] [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--json]
 """
 import argparse
 import base64
@@ -678,12 +677,9 @@ def _compress_dates(days):
 def collect_consumption(client, account, contracts, date_from, date_to):
     """Walk the history once. Return the real and estimated aggregates."""
     groups = {"year": {}, "month": {}, "hour": {}}
-    periods = {"P1": {"kwh": 0.0, "hours": 0, "days": set()},
-               "P2": {"kwh": 0.0, "hours": 0, "days": set()},
-               "P3": {"kwh": 0.0, "hours": 0, "days": set()}}
+    periods_real = {"P1": 0.0, "P2": 0.0, "P3": 0.0}
     total_real = total_estimated = 0.0
     real_hours = estimated_hours = 0
-    real_days = set()
     estimated_days = set()
     year_peak = {}
     month_peak = {}
@@ -733,11 +729,8 @@ def collect_consumption(client, account, contracts, date_from, date_to):
                 if measured:
                     total_real += kwh
                     real_hours += 1
-                    real_days.add(day)
-                    if row["period"] in periods:
-                        periods[row["period"]]["kwh"] += kwh
-                        periods[row["period"]]["hours"] += 1
-                        periods[row["period"]]["days"].add(day)
+                    if row["period"] in periods_real:
+                        periods_real[row["period"]] += kwh
                     if day.year not in year_peak or kwh > year_peak[day.year][0]:
                         year_peak[day.year] = (kwh, row["date"], row["hour"])
                     month_key = "%04d-%02d" % (day.year, day.month)
@@ -755,8 +748,7 @@ def collect_consumption(client, account, contracts, date_from, date_to):
 
     return {
         "groups": groups,
-        "periods": periods,
-        "real_days": real_days,
+        "periods_real_kwh": periods_real,
         "real_kwh": total_real,
         "estimated_kwh": total_estimated,
         "real_hours": real_hours,
@@ -801,7 +793,7 @@ def cmd_consume(args):
         "estimated_kwh": round(data["estimated_kwh"], 3),
         "real_hours": data["real_hours"],
         "estimated_hours": data["estimated_hours"],
-        "periods_real_kwh": {k: round(v["kwh"], 3) for k, v in data["periods"].items()},
+        "periods_real_kwh": {k: round(v, 3) for k, v in data["periods_real_kwh"].items()},
         "estimated_days": _compress_dates(data["estimated_days"]),
         "groups": _groups_list(data["groups"][args.group]),
     }
@@ -858,7 +850,7 @@ def cmd_report(args):
         "estimated_kwh": round(data["estimated_kwh"], 3),
         "real_hours": data["real_hours"],
         "estimated_hours": data["estimated_hours"],
-        "periods_real_kwh": {k: round(v["kwh"], 3) for k, v in data["periods"].items()},
+        "periods_real_kwh": {k: round(v, 3) for k, v in data["periods_real_kwh"].items()},
         "has_estimated": bool(data["estimated_days"]),
         "estimated_days": _compress_dates(data["estimated_days"]),
         "consumption_by_year": _groups_list(data["groups"]["year"]),
@@ -912,40 +904,6 @@ def cmd_report(args):
         print("  Estimated dates:", ", ".join(result["estimated_days"]))
     else:
         print("No estimated consumptions. All data is real.")
-
-
-def cmd_days(args):
-    client, account, cups, supplies, current, contracted = _select_cups(args)
-    data = collect_consumption(client, account, supplies, args.date_from, args.date_to)
-    periods = {}
-    for name in ("P1", "P2", "P3"):
-        entry = data["periods"][name]
-        periods[name] = {"days": len(entry["days"]), "hours": entry["hours"],
-                         "kwh": round(entry["kwh"], 3)}
-    result = {
-        "cups": cups,
-        "contracted_power_kw": contracted,
-        "from": data["from"].isoformat() if data["from"] else None,
-        "to": data["to"].isoformat() if data["to"] else None,
-        "real_days": len(data["real_days"]),
-        "real_hours": data["real_hours"],
-        "real_kwh": round(data["real_kwh"], 3),
-        "estimated_kwh": round(data["estimated_kwh"], 3),
-        "periods": periods,
-    }
-    if args.json:
-        print(json.dumps(result, ensure_ascii=False, indent=2))
-        return
-    print("CUPS:", result["cups"], "| contracted power:", result["contracted_power_kw"], "kW")
-    print("Period:", result["from"], "->", result["to"])
-    print("Real days:", result["real_days"], "| real hours:", result["real_hours"],
-          "| real total:", result["real_kwh"], "kWh")
-    print("By period (real only):")
-    for name in ("P1", "P2", "P3"):
-        item = periods[name]
-        print("  %s  days=%d  hours=%d  kWh=%.3f" % (
-            name, item["days"], item["hours"], item["kwh"]))
-    print("Estimated (excluded):", result["estimated_kwh"], "kWh")
 
 
 def cmd_maxpower(args):
@@ -1050,14 +1008,6 @@ def build_parser():
     report.add_argument("--to", dest="date_to", help="YYYY-MM-DD")
     report.add_argument("--json", action="store_true")
     report.set_defaults(func=cmd_report)
-
-    days = sub.add_parser("days", parents=[common],
-                          help="real days and consumption per period for a CUPS")
-    days.add_argument("--cups")
-    days.add_argument("--from", dest="date_from", help="YYYY-MM-DD")
-    days.add_argument("--to", dest="date_to", help="YYYY-MM-DD")
-    days.add_argument("--json", action="store_true")
-    days.set_defaults(func=cmd_days)
     return parser
 
 
