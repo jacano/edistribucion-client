@@ -109,7 +109,17 @@ MAXIMUM PER YEAR
   2024   3.330 kWh  15/12/2024 10 - 11 h     4.760 kW  28/10/2024 22:15
   2025   3.625 kWh  02/02/2025 21 - 22 h     5.024 kW  20/02/2025 21:45
 
-NOTE: the last readings are estimated. The last real day is 2026-09-12.
+RECENT (last 3 months)
+  Today:             2026-09-14
+  Data to:           2026-09-14 (0 days old)
+  Last reading:      2026-09-14 (estimated)
+  Last real reading: 2026-09-12
+  Ranges:
+    2026-06-17..2026-07-22   real
+    2026-07-23               mixed
+    2026-07-24               estimated
+    2026-07-25..2026-09-12   real
+    2026-09-13..2026-09-14   estimated
 
 ESTIMATED MAP (R real, E estimated, M mixed, . no data)
       Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec

@@ -40,7 +40,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 from ctypes import wintypes
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 BASE = "https://zonaprivada.edistribucion.com"
 SITE = BASE + "/areaprivada"
@@ -784,6 +784,7 @@ def collect_consumption(client, account, contracts, listing):
     first = last = None
     last_real = None
     hours = {}
+    day_counts = {}
 
     def bucket(group, key):
         return groups[group].setdefault(key, {"real_kwh": 0.0, "estimated_kwh": 0.0,
@@ -817,6 +818,8 @@ def collect_consumption(client, account, contracts, listing):
         target = periods_real if real else periods_estimated
         if period in target:
             target[period] += kwh
+        counts = day_counts.setdefault(day, [0, 0])
+        counts[0 if real else 1] += 1
         label = "%02d - %02d h" % (hour, hour + 1)
         if real:
             total_real += kwh
@@ -852,6 +855,7 @@ def collect_consumption(client, account, contracts, listing):
         "from": first,
         "to": last,
         "last_real": last_real,
+        "day_counts": day_counts,
     }
 
 
@@ -878,6 +882,41 @@ def _max_demand(client, account, cups_id, year_from, year_to):
             key = "%s-%s" % (parts[2], parts[1]) if len(parts) == 3 else date
             monthly[key] = {"kw": point.get("value"), "date": date, "hour": point.get("hour")}
     return monthly
+
+
+def day_status(counts):
+    """Return R, E, M or . for a day, from its real and estimated hour counts."""
+    if not counts:
+        return "."
+    if counts[1] == 0:
+        return "R"
+    if counts[0] == 0:
+        return "E"
+    return "M"
+
+
+def recent_ranges(day_counts, last_day, days=90):
+    """Return the status of the last days as a list of ranges."""
+    start = last_day - timedelta(days=days - 1)
+    ranges = []
+    run_start = run_end = None
+    run_status = None
+    day = start
+    while day <= last_day:
+        status = day_status(day_counts.get(day))
+        if run_start is None:
+            run_start = run_end = day
+            run_status = status
+        elif status == run_status and (day - run_end).days == 1:
+            run_end = day
+        else:
+            ranges.append((run_start, run_end, run_status))
+            run_start = run_end = day
+            run_status = status
+        day += timedelta(days=1)
+    if run_start is not None:
+        ranges.append((run_start, run_end, run_status))
+    return ranges
 
 
 def _print_kwh_table(title, key_label, rows, total):
@@ -977,11 +1016,20 @@ def _print_report(result):
         print("  %-4s  %10s  %-20s  %11s  %s"
               % (year, peak_kwh, peak_when, power_kw, power_when))
     print()
+    recent = result["recent"]
+    labels = {"R": "real", "E": "estimated", "M": "mixed", ".": "no data"}
+    print("RECENT (last 3 months)")
+    print("  Today:             %s" % recent["today"])
+    print("  Data to:           %s (%d days old)" % (recent["to"], recent["delay_days"]))
+    print("  Last reading:      %s (%s)" % (recent["to"], labels[recent["last_status"]]))
+    print("  Last real reading: %s" % (recent["last_real"] or "-"))
+    print("  Ranges:")
+    for item in recent["ranges"]:
+        span = (item["from"] if item["from"] == item["to"]
+                else "%s..%s" % (item["from"], item["to"]))
+        print("    %-24s %s" % (span, labels[item["status"]]))
+    print()
     if result["has_estimated"]:
-        if result["last_real"] and result["last_real"] < result["to"]:
-            print("NOTE: the last readings are estimated. The last real day is %s."
-                  % result["last_real"])
-            print()
         print("ESTIMATED MAP (R real, E estimated, M mixed, . no data)")
         months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -1034,13 +1082,25 @@ def cmd_report(args):
             year = int(month_key.split("-")[0])
             if year not in year_power or info["kw"] > year_power[year]["kw"]:
                 year_power[year] = info
+        last_day = data["to"]
+        today = date.today()
+        ranges = recent_ranges(data["day_counts"], last_day)
         result = {
             "cups": cups,
             "tariff": tariff,
             "contracted_power_kw": contracted,
             "from": data["from"].isoformat(),
-            "to": data["to"].isoformat(),
+            "to": last_day.isoformat(),
             "last_real": data["last_real"].isoformat() if data["last_real"] else None,
+            "recent": {
+                "today": today.isoformat(),
+                "to": last_day.isoformat(),
+                "delay_days": (today - last_day).days,
+                "last_status": day_status(data["day_counts"].get(last_day)),
+                "last_real": data["last_real"].isoformat() if data["last_real"] else None,
+                "ranges": [{"from": first.isoformat(), "to": end.isoformat(), "status": status}
+                           for first, end, status in ranges],
+            },
             "real_kwh": round(data["real_kwh"], 3),
             "estimated_kwh": round(data["estimated_kwh"], 3),
             "real_hours": data["real_hours"],
