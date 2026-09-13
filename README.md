@@ -62,12 +62,12 @@ Period: 2024-01-16 -> 2026-09-14
 REAL CONSUMPTION
   Total: 5797.068 kWh in 15911 hours
   Periods: {'P1': 1890.9, 'P2': 1704.064, 'P3': 2202.104}
-  By year (real | estimated kWh, real hours):
-    2024    2007.797 |    595.522  |   6265 h
+  By year (real | estimated kWh, real | estimated hours):
+    2024    2007.797 |    595.522  |   6265 h |   2158 h
       P1   606.608 |  165.083
       P2   596.359 |  182.676
       P3   804.830 |  247.763
-    2025    2613.067 |    912.146  |   5837 h
+    2025    2613.067 |    912.146  |   5837 h |   2922 h
       ...
   By month (real | estimated kWh):
     2024-03      11.335 |    225.417
