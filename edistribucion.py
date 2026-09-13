@@ -18,9 +18,9 @@ Session: session.json (or the EDIST_SID environment variable). Commands:
   python edistribucion.py import-cookies [FILE]  # import a cookies.txt
   python edistribucion.py save --sid "<value>"   # save a value by hand
   python edistribucion.py cups                   # list supplies
-  python edistribucion.py consume --cups <CUPS> [--from YYYY-MM-DD] [--to YYYY-MM-DD]
-                                  [--group hour|day|month|year] [--cont <id>] [--json]
-  python edistribucion.py maxpower --cups <CUPS> [--from YYYY-MM] [--to YYYY-MM] [--json]
+  python edistribucion.py consume [--cups <CUPS>] [--from YYYY-MM-DD] [--to YYYY-MM-DD]
+                                  [--group hour|month|year] [--json]
+  python edistribucion.py maxpower [--cups <CUPS>] [--from YYYY-MM] [--to YYYY-MM] [--json]
 """
 import argparse
 import base64
@@ -630,8 +630,6 @@ CHUNK_DAYS = 35
 def _group_key(group, day, hour):
     if group == "hour":
         return "%02d" % int(hour[:2])
-    if group == "day":
-        return day.isoformat()
     if group == "month":
         return "%04d-%02d" % (day.year, day.month)
     return "%04d" % day.year
@@ -663,11 +661,6 @@ def cmd_consume(args):
     cups = resolve_cups(all_supplies, args.cups)
     supplies = [item for item in all_supplies if item["cups"] == cups]
     contracts = supplies
-    if args.cont:
-        contracts = [item for item in supplies if item["contract_id"] == args.cont]
-        if not contracts:
-            print("Unknown contract:", args.cont, file=sys.stderr)
-            sys.exit(1)
     current = next((item for item in supplies if not item.get("end")), supplies[-1])
 
     ranges = []
@@ -852,9 +845,8 @@ def build_parser():
     consume.add_argument("--cups", help="the CUPS to aggregate (only needed with several)")
     consume.add_argument("--from", dest="date_from", help="YYYY-MM-DD")
     consume.add_argument("--to", dest="date_to", help="YYYY-MM-DD")
-    consume.add_argument("--group", choices=["hour", "day", "month", "year"],
-                         default="day", help="group by hour of day, day, month or year")
-    consume.add_argument("--cont")
+    consume.add_argument("--group", choices=["hour", "month", "year"],
+                         default="month", help="group by hour of day, month or year")
     consume.add_argument("--json", action="store_true")
     consume.set_defaults(func=cmd_consume)
 

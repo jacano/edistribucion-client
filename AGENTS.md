@@ -51,11 +51,10 @@ python edistribucion.py consume --cups ES0031102226226018WR0F --from 2024-01-16 
 
 - `--cups` is only needed when the account has several CUPS. With one CUPS, the
   tool picks it. Run `cups` to list the CUPS values.
-- `--group` is `hour`, `day`, `month`, or `year`. The default is `day`.
+- `--group` is `hour`, `month`, or `year`. The default is `month`.
 - `hour` groups by hour of the day (00 to 23).
 - `--from` and `--to` are `YYYY-MM-DD`. Without them, it covers the full
   history.
-- `--cont` picks one supply. Without it, the tool uses the open contract.
 - `--json` gives raw JSON.
 
 The output has these keys:

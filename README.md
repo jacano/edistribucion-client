@@ -44,7 +44,7 @@ python edistribucion.py login-backend
 # List supplies. Shows the CUPS id and the contracted power.
 python edistribucion.py cups
 
-# Aggregate consumption by day (default).
+# Aggregate consumption by month (default).
 python edistribucion.py consume
 
 # Aggregate by hour of the day, month, or year.
