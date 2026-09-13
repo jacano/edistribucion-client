@@ -323,9 +323,13 @@ def parse_cookies_file(path):
 
 
 def find_cookies_file():
-    """Find the newest cookies file in the Downloads folders."""
+    """Find the newest cookies file for the portal in the Downloads folders.
+
+    Only files that mention `edistribucion` count. This avoids other cookie
+    exports, such as files for other sites.
+    """
     home = os.path.expanduser("~")
-    candidates = []
+    best = None
     for folder_name in ("Downloads", "Descargas"):
         folder = os.path.join(home, folder_name)
         if not os.path.isdir(folder):
@@ -336,15 +340,17 @@ def find_cookies_file():
                 continue
             path = os.path.join(folder, entry)
             try:
+                with open(path, encoding="utf-8", errors="replace") as fh:
+                    text = fh.read().lower()
                 mtime = os.path.getmtime(path)
             except OSError:
                 continue
+            if "edistribucion" not in text:
+                continue
             score = 1 if "cookie" in lower else 0
-            candidates.append((score, mtime, path))
-    if not candidates:
-        return None
-    candidates.sort(reverse=True)
-    return candidates[0][2]
+            if best is None or (score, mtime) > (best[0], best[1]):
+                best = (score, mtime, path)
+    return best[2] if best else None
 
 
 # ---------------------------------------------------------------- CLI helpers
