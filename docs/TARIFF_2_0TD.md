@@ -143,9 +143,5 @@ def tariff_period(day, hour):
 
 ## Sources
 
-- Preciluz, "Dias festivos y precio de la luz":
-  <https://preciluz.com/dias-festivos-luz/>
-- Plenitude, "Tarifa 2.0TD de Luz":
-  <https://eniplenitude.es/blog/actualidad/nuevo-recibo-de-la-luz/>
 - Circular 3/2020 of the CNMC, Article 7, BOE-A-2020-1066:
   <https://www.boe.es/buscar/act.php?id=BOE-A-2020-1066>
