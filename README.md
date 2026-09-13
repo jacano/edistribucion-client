@@ -90,6 +90,24 @@ protocol callback gets data from the page URL. The page cannot read an HttpOnly
 cookie. So the callback cannot carry the `sid`. That is why this step is
 manual.
 
+## DevTools login (agent)
+
+This flow uses your normal Chrome with the `chrome-devtools` MCP. No extension,
+no bookmark, no proxy. The agent reads the `sid` value and sends it to our app.
+
+1. Log in to the portal in Chrome.
+2. Ask the agent: "save my e-distribucion session".
+3. The agent reads the `sid` value with the Chrome DevTools MCP. It reads the
+   `Cookie` header of a portal request.
+4. The agent calls the tool `edist_save_session` with the value.
+5. The tool saves the session. Later commands use plain HTTP.
+
+Turn on remote debugging once:
+
+- Open `chrome://inspect/#remote-debugging`.
+- Turn on Remote Debugging.
+- When the agent connects, Chrome asks for permission. Click Allow.
+
 ## Proxy login
 
 This flow captures the session without an extension and without a bookmark. It

@@ -84,6 +84,16 @@ def tool_read_callback(_args):
     return format_callback(payload)
 
 
+def tool_save_session(args):
+    sid = args.get("sid")
+    if not sid:
+        raise RuntimeError("Missing sid")
+    session = Session(sid=sid)
+    session.save()
+    account = Client(session).whoami()
+    return "Session saved. User: %s" % account["name"]
+
+
 def tool_periods(args):
     client = get_client()
     account = client.whoami()
@@ -143,6 +153,13 @@ TOOLS = [
      "description": "Read the last result sent by the bookmarklet through the edist:// callback.",
      "inputSchema": {"type": "object", "properties": {}},
      "fn": tool_read_callback},
+    {"name": "edist_save_session",
+     "description": ("Save the session cookie. Use it after the agent reads the `sid` value "
+                     "from the browser DevTools (for example from a portal request header)."),
+     "inputSchema": {"type": "object", "properties": {
+         "sid": {"type": "string", "description": "value of the sid cookie"}},
+         "required": ["sid"]},
+     "fn": tool_save_session},
     {"name": "edist_periods",
      "description": "Billing periods / contracts and the available date range.",
      "inputSchema": {"type": "object", "properties": {
