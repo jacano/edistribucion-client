@@ -85,4 +85,5 @@ The portal has no data before 2024-01-16.
 
 - `edistribucion.py`: the tool.
 - `AUTHENTICATION.md`: how to get the session.
+- `TARIFF_2_0TD.md`: the 2.0TD periods and the period calculation.
 - `README.md`: the main guide.

@@ -81,7 +81,8 @@ WARNING: there are estimated consumptions.
 
 The tool asks the portal for one zip with the hourly curves and reads it. This
 is much faster than one call per month. The period (P1, P2, P3) is worked out
-from the 2.0TD calendar. The portal has no data before 2024-01-16.
+from the 2.0TD calendar. All the details are in
+[TARIFF_2_0TD.md](TARIFF_2_0TD.md). The portal has no data before 2024-01-16.
 
 ## Security
 
