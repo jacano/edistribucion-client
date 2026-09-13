@@ -876,16 +876,18 @@ def cmd_report(args):
     print("REAL CONSUMPTION")
     print("  Total:", result["real_kwh"], "kWh in", result["real_hours"], "hours")
     print("  Periods:", result["periods_real_kwh"])
-    print("  By year:")
+    print("  By year (real | estimated kWh):")
     for group in result["consumption_by_year"]:
-        print("    %s  %10.3f kWh" % (group["key"], group["real_kwh"]))
-    print("  By month:")
+        print("    %s  %10.3f | %10.3f" % (
+            group["key"], group["real_kwh"], group["estimated_kwh"]))
+    print("  By month (real | estimated kWh):")
     for group in result["consumption_by_month"]:
-        note = "" if group["estimated_hours"] == 0 else "  (estimated %d h)" % group["estimated_hours"]
-        print("    %s  %10.3f kWh%s" % (group["key"], group["real_kwh"], note))
-    print("  By hour of day:")
+        print("    %s  %10.3f | %10.3f" % (
+            group["key"], group["real_kwh"], group["estimated_kwh"]))
+    print("  By hour of day (real | estimated kWh):")
     for group in result["consumption_by_hour"]:
-        print("    %s  %10.3f kWh" % (group["key"], group["real_kwh"]))
+        print("    %s  %10.3f | %10.3f" % (
+            group["key"], group["real_kwh"], group["estimated_kwh"]))
     print()
     print("MAX HOURLY CONSUMPTION")
     for year, value in result["max_hourly_by_year"].items():

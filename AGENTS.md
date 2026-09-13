@@ -107,7 +107,7 @@ python edistribucion.py report
 This is the full report for one CUPS. It contains:
 
 - the contracted power per period,
-- the real consumption total and the split by year, month, and hour,
+- the consumption by year, month, and hour, with real and estimated values,
 - the maximum consumption in one hour per year,
 - the maximum demanded power per year and per month,
 - a warning when estimated data exists, with the dates.
