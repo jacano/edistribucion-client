@@ -42,6 +42,24 @@ Full steps are in [AUTHENTICATION.md](AUTHENTICATION.md).
 python edistribucion.py login
 ```
 
+## Console method
+
+Use this method when the session is hard to copy. The tool does not need the
+session. The page runs the query and copies the result.
+
+1. Log in to the portal.
+2. Run `python edistribucion.py js`. Copy the printed code.
+3. Open DevTools and select the Console tab.
+4. Paste the code. Press Enter.
+5. Answer the prompt. The result goes to your clipboard.
+6. Run `python edistribucion.py paste`. Paste the result. Press Enter, then
+   `Ctrl+Z`, then Enter.
+
+The command prints the formatted result.
+
+Note: a Console snippet cannot read the `sid` cookie, because it is HttpOnly.
+So this method returns the data, not the session.
+
 ## Commands
 
 ```bash
