@@ -818,8 +818,9 @@ def collect_consumption(client, account, contracts, listing):
         target = periods_real if real else periods_estimated
         if period in target:
             target[period] += kwh
-        counts = day_counts.setdefault(day, [0, 0])
-        counts[0 if real else 1] += 1
+        counts = day_counts.setdefault(day, {"real": 0, "estimated": 0, "kwh": 0.0})
+        counts["kwh"] += kwh
+        counts["real" if real else "estimated"] += 1
         label = "%02d - %02d h" % (hour, hour + 1)
         if real:
             total_real += kwh
@@ -885,14 +886,18 @@ def _max_demand(client, account, cups_id, year_from, year_to):
 
 
 def day_status(counts):
-    """Return R, E, M or . for a day, from its real and estimated hour counts."""
+    """Return R, E, M, P or . for a day.
+
+    R real, E estimated, M mixed, P pending (estimated, but no reading yet),
+    . no data.
+    """
     if not counts:
         return "."
-    if counts[1] == 0:
-        return "R"
-    if counts[0] == 0:
-        return "E"
-    return "M"
+    if counts["real"] and counts["estimated"]:
+        return "M"
+    if counts["estimated"]:
+        return "P" if counts["kwh"] == 0 else "E"
+    return "R"
 
 
 def recent_ranges(day_counts, last_day, days=90):
@@ -1017,12 +1022,13 @@ def _print_report(result):
               % (year, peak_kwh, peak_when, power_kw, power_when))
     print()
     recent = result["recent"]
-    labels = {"R": "real", "E": "estimated", "M": "mixed", ".": "no data"}
+    labels = {"R": "real", "E": "estimated", "M": "mixed",
+              "P": "pending (no reading yet)", ".": "no data"}
     print("RECENT (last 3 months)")
-    print("  Today:             %s" % recent["today"])
-    print("  Data to:           %s (%d days old)" % (recent["to"], recent["delay_days"]))
-    print("  Last reading:      %s (%s)" % (recent["to"], labels[recent["last_status"]]))
-    print("  Last real reading: %s" % (recent["last_real"] or "-"))
+    print("  Today:        %s" % recent["today"])
+    if recent["last_reading"]:
+        print("  Last reading: %s (%s, %d days old)"
+              % (recent["last_reading"], labels[recent["last_status"]], recent["delay_days"]))
     print("  Ranges:")
     for item in recent["ranges"]:
         span = (item["from"] if item["from"] == item["to"]
@@ -1082,9 +1088,12 @@ def cmd_report(args):
             year = int(month_key.split("-")[0])
             if year not in year_power or info["kw"] > year_power[year]["kw"]:
                 year_power[year] = info
+        counts = data["day_counts"]
         last_day = data["to"]
         today = date.today()
-        ranges = recent_ranges(data["day_counts"], last_day)
+        last_value = max((day for day, value in counts.items() if value["kwh"] > 0),
+                         default=None)
+        ranges = recent_ranges(counts, last_day)
         result = {
             "cups": cups,
             "tariff": tariff,
@@ -1095,9 +1104,9 @@ def cmd_report(args):
             "recent": {
                 "today": today.isoformat(),
                 "to": last_day.isoformat(),
-                "delay_days": (today - last_day).days,
-                "last_status": day_status(data["day_counts"].get(last_day)),
-                "last_real": data["last_real"].isoformat() if data["last_real"] else None,
+                "last_reading": last_value.isoformat() if last_value else None,
+                "last_status": day_status(counts.get(last_value)) if last_value else None,
+                "delay_days": (today - last_value).days if last_value else None,
                 "ranges": [{"from": first.isoformat(), "to": end.isoformat(), "status": status}
                            for first, end, status in ranges],
             },

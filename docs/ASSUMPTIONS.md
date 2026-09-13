@@ -31,6 +31,11 @@ differ. Read this list before you trust a number.
 - The tool reads the `REAL/ESTIMADO` column of the CSV.
 - A value that starts with `R` is real. Every other value is estimated.
 - In the test account the values are `R` and `E` only.
+- The last one or two days come as estimated with 0 kWh, because the portal has
+  no reading for them yet. The tool marks these days as `pending`, not as
+  estimated consumption.
+- The portal publishes the real reading of a day with a small delay. In the
+  test account the last real day was two days before today.
 
 ## 5. The zip from the portal
 

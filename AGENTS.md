@@ -57,9 +57,9 @@ for each CUPS of the account, one after another. It contains:
   real and estimated values,
 - the maximum consumption in one hour per year,
 - the maximum demanded power per year and per month,
-- a zoom of the last 3 months (the last reading, the delay of the data, and the
-  real and estimated ranges), and a monthly map (R real, E estimated, M mixed,
-  . no data).
+- a zoom of the last 3 months (the last reading and its delay, and the real,
+  estimated and pending ranges), and a monthly map (R real, E estimated,
+  M mixed, P pending, . no data).
 
 Option:
 
