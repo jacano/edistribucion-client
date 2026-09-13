@@ -414,34 +414,37 @@ def cmd_login(args):
     print("Opening the login page in your browser...")
     webbrowser.open(BASE + LOGIN_PAGE)
     print()
-    print("Log in to the portal. Then choose how to return the session:")
-    print("  1. Paste a line from DevTools (the Cookie header, or 'Copy as cURL').")
-    print("  2. Import a cookies.txt file.")
-    print("  3. Let the agent read it with the Chrome MCP.")
-    method = args.method or (input("Choose 1, 2 or 3 [1]: ").strip() or "1")
+    print("Log in to the portal. Then choose how to return the session.")
+    print()
+    print("  paste    copy the Cookie header (or a cURL line) from DevTools and paste it here")
+    print("  cookies  import a cookies.txt file")
+    print("  agent    let the agent read it with the Chrome DevTools MCP")
+    print()
+    method = args.method or (input("Type paste, cookies or agent [paste]: ").strip().lower() or "paste")
 
     session = Session(path=args.session)
-    if method == "1":
+    if method == "paste":
         text = input("Paste the Cookie header or cURL line: ").strip()
         cookies = extract_cookies_from_text(text)
         if not cookies.get("sid"):
             print("No sid found in the text.", file=sys.stderr)
             sys.exit(1)
         session.cookies.update(cookies)
-    elif method == "2":
+    elif method == "cookies":
         path = input("Path to cookies.txt [cookies.txt]: ").strip() or "cookies.txt"
         cookies = parse_cookies_file(path)
         if not cookies.get("sid"):
             print("No sid found in", path, file=sys.stderr)
             sys.exit(1)
         session.cookies.update(cookies)
-    elif method == "3":
+    elif method == "agent":
         print("Ask the agent: 'capture my e-distribucion session'.")
         print("The agent reads the Cookie header with the Chrome DevTools MCP,")
         print("then runs:  python edistribucion.py save --sid \"<sid value>\"")
         return
     else:
         print("Unknown method:", method, file=sys.stderr)
+        print("Use paste, cookies or agent.", file=sys.stderr)
         sys.exit(1)
 
     session.save()
@@ -513,15 +516,6 @@ def cmd_range(args):
     print_summary(summarize(data), args.date_from, args.date_to, contract, args.json)
 
 
-def cmd_parse(args):
-    raw = json.load(open(args.file, encoding="utf-8"))
-    if "actions" in raw:
-        data = raw["actions"][0]["returnValue"]["data"]
-    else:
-        data = raw.get("returnValue", {}).get("data", raw)
-    print(json.dumps(summarize(data), ensure_ascii=False, indent=2))
-
-
 def build_parser():
     parser = argparse.ArgumentParser(
         description="Unofficial HTTP-only client for e-distribucion (no browser)")
@@ -544,8 +538,8 @@ def build_parser():
 
     login = sub.add_parser("login", parents=[common],
                            help="open the login page and save the session")
-    login.add_argument("--method", choices=["1", "2", "3"],
-                       help="1 paste, 2 cookies file, 3 agent")
+    login.add_argument("--method", choices=["paste", "cookies", "agent"],
+                       help="paste, cookies or agent")
     login.set_defaults(func=cmd_login)
 
     sub.add_parser("status", parents=[common],
@@ -569,10 +563,6 @@ def build_parser():
     rng.add_argument("--cont")
     rng.add_argument("--json", action="store_true")
     rng.set_defaults(func=cmd_range)
-
-    parse = sub.add_parser("parse", parents=[common], help="parse a previously saved response")
-    parse.add_argument("--file", required=True)
-    parse.set_defaults(func=cmd_parse)
     return parser
 
 

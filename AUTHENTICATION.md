@@ -1,29 +1,30 @@
 # Authentication
 
 The starting point is the tool. Run the `login` command. The tool opens the
-e-distribucion login page. Log in to the portal. Then choose one of two ways to
-return the session to the tool.
+e-distribucion login page. Log in to the portal. Then choose how to return the
+session.
 
 ```bash
 python edistribucion.py login
 ```
 
-The tool asks:
+The tool shows three ways:
 
 ```
-Log in to the portal. Then choose how to return the session:
-  1. Paste a line from DevTools (the Cookie header, or 'Copy as cURL').
-  2. Import a cookies.txt file.
-Choose 1 or 2 [1]:
+  paste    copy the Cookie header (or a cURL line) from DevTools and paste it here
+  cookies  import a cookies.txt file
+  agent    let the agent read it with the Chrome DevTools MCP
+
+Type paste, cookies or agent [paste]:
 ```
 
-You can pick the option in advance with `--method`:
+You can pick the way in advance with `--method`:
 
 ```bash
-python edistribucion.py login --method 1
+python edistribucion.py login --method paste
 ```
 
-Both options write `sesion.json`. The session is the `sid` cookie.
+All ways write `sesion.json`. The session is the `sid` cookie.
 
 ## Option 1: paste a line from DevTools
 
