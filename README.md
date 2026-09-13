@@ -4,7 +4,9 @@ This tool reads your electricity consumption from the e-distribucion private
 area (Endesa group). It uses HTTP only. It runs in the terminal. It also works
 as an MCP server for agents.
 
-The tool does not use a browser. It uses only the Python standard library.
+The client uses HTTP only. It uses only the Python standard library. One
+optional command opens your browser to the login page. The client never
+controls the browser.
 
 Warning: this tool is not official. It is not connected to e-distribucion or
 Endesa. Use it only with your own account. The portal can change at any time.
@@ -60,6 +62,31 @@ python edistribucion.py import-cookies cookies.txt
 
 The command reads the `sid` cookie and saves it to `sesion.json`. The command
 also accepts a JSON export.
+
+## Login command
+
+The command `login` opens the login page in your browser. Then it asks for the
+`sid` value.
+
+```bash
+python edistribucion.py login
+```
+
+Steps:
+
+1. Run the command. Your browser opens the login page.
+2. Log in.
+3. Open DevTools. Select Application, then Cookies.
+4. Select `zonaprivada.edistribucion.com`.
+5. Copy the value of `sid`.
+6. Paste the value in the terminal.
+
+The command saves the value and checks the session.
+
+The `sid` cookie is HttpOnly. The browser hides it from scripts. A custom
+protocol callback gets data from the page URL. The page cannot read an HttpOnly
+cookie. So the callback cannot carry the `sid`. That is why this step is
+manual.
 
 ## Commands
 

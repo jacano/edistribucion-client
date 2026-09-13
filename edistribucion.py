@@ -29,12 +29,14 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+import webbrowser
 from datetime import date, datetime, timedelta
 
 BASE = "https://zonaprivada.edistribucion.com"
 SITE = BASE + "/areaprivada"
 AURA_ENDPOINT = SITE + "/s/sfsites/aura"
 HOME_PAGE = "/areaprivada/s/"
+LOGIN_PAGE = "/areaprivada/s/login/"
 MEASURELIST_PAGE = "/areaprivada/s/wp-measurelist-v4"
 DETAIL_PAGE = "/areaprivada/s/wp-measure-detail-v4"
 
@@ -382,6 +384,30 @@ def cmd_import_cookies(args):
     print("sid found:", "yes" if session.cookies.get("sid") else "no")
 
 
+def cmd_login(args):
+    print("Opening the login page in your browser...")
+    webbrowser.open(BASE + LOGIN_PAGE)
+    print()
+    print("After you log in, copy the sid cookie value:")
+    print("  DevTools > Application > Cookies > zonaprivada.edistribucion.com > sid")
+    print()
+    sid = args.sid or os.environ.get("EDIST_SID")
+    if not sid:
+        sid = input("Paste the sid value and press Enter: ").strip()
+    if not sid:
+        print("No value given. Nothing saved.", file=sys.stderr)
+        sys.exit(1)
+    session = Session(sid=sid, path=args.session)
+    session.save()
+    print("Session saved to", args.session)
+    try:
+        account = Client(session).whoami()
+        print("Login OK. User:", account["name"])
+    except Exception as exc:
+        print("Could not verify the session:", exc, file=sys.stderr)
+        sys.exit(1)
+
+
 def cmd_status(args):
     client, account, supplies = load_context(args)
     print(json.dumps({"name": account["name"], "supplies": len(supplies),
@@ -465,6 +491,9 @@ def build_parser():
                          help="import cookies from a cookies.txt (Netscape) or JSON file")
     imp.add_argument("file", help="path to cookies.txt or JSON export")
     imp.set_defaults(func=cmd_import_cookies)
+
+    login = sub.add_parser("login", help="open the login page and save the sid cookie")
+    login.set_defaults(func=cmd_login)
 
     sub.add_parser("status", help="account and supplies").set_defaults(func=cmd_status)
     sub.add_parser("cups", help="list supplies").set_defaults(func=cmd_cups)
