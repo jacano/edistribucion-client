@@ -63,6 +63,43 @@ You can also import the file directly, without the menu:
 python edistribucion.py import-cookies cookies.txt
 ```
 
+## Option 3: agent reads the session with the Chrome DevTools MCP
+
+This option is for an agent. The agent uses the `chrome-devtools` MCP with
+autoconnect. That MCP attaches to your normal Chrome. It does not change your
+profile.
+
+What you need:
+
+- The `chrome-devtools` MCP with autoconnect. You configured it already.
+- Remote debugging turned on one time.
+
+Turn on remote debugging:
+
+1. Open `chrome://inspect/#remote-debugging`.
+2. Turn on Remote debugging.
+3. When the agent connects, Chrome asks for permission. Click Allow.
+
+Steps:
+
+1. Log in to the portal in Chrome.
+2. Ask the agent: "capture my e-distribucion session".
+3. The agent reads the `Cookie` header of a portal request with the MCP.
+4. The agent saves the session in one of two ways.
+
+```bash
+python edistribucion.py save --sid "<sid value>"
+```
+
+```bash
+python edistribucion.py save --text "<Cookie header>"
+```
+
+5. The tool writes `sesion.json` and checks the session.
+
+This option works because the MCP reads the request, not the page. The request
+carries the HttpOnly `sid` cookie. The page cannot see it. The request can.
+
 ## Direct options
 
 You can also skip the menu.

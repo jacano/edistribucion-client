@@ -369,15 +369,26 @@ def print_summary(summary, date_from, date_to, contract, as_json):
 # ---------------------------------------------------------------- commands
 def cmd_save(args):
     session = Session(sid=args.sid, path=args.session)
+    if args.text:
+        session.cookies.update(extract_cookies_from_text(args.text))
     if args.cookie:
         for pair in args.cookie.split(";"):
             pair = pair.strip()
             if "=" in pair:
                 key, value = pair.split("=", 1)
                 session.cookies[key] = value
+    if not session.sid:
+        print("No sid value found. Pass --sid or --text.", file=sys.stderr)
+        sys.exit(1)
     session.save()
     print("Session saved to", args.session)
     print("cookies:", ", ".join(session.cookies.keys()))
+    try:
+        account = Client(session).whoami()
+        print("Login OK. User:", account["name"])
+    except Exception as exc:
+        print("Session saved, but the check failed:", exc, file=sys.stderr)
+        sys.exit(1)
 
 
 def cmd_import_cookies(args):
@@ -575,6 +586,7 @@ def build_parser():
 
     save = sub.add_parser("save", parents=[common], help="store the session cookie")
     save.add_argument("--cookie", help="extra cookies: 'k=v; k2=v2'")
+    save.add_argument("--text", help="a Cookie header or a cURL line that holds the session")
     save.set_defaults(func=cmd_save)
 
     imp = sub.add_parser("import-cookies", parents=[common],

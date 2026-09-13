@@ -34,7 +34,9 @@ offers two ways to return the session to the tool:
 1. Paste a line from DevTools (the `Cookie` header, or "Copy as cURL").
 2. Import a `cookies.txt` file.
 
-You can also pass the session directly with `--sid`.
+There is also an agent option. An agent with the Chrome DevTools MCP reads the
+`Cookie` header of a portal request and saves the session. You can also pass the
+session directly with `--sid`.
 
 Full steps are in [AUTHENTICATION.md](AUTHENTICATION.md).
 

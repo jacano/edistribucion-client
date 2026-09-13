@@ -27,6 +27,43 @@ Use it when the user asks for:
   user to run `python edistribucion.py login` and follow the steps. See
   `AUTHENTICATION.md`.
 
+## Capture the session from Chrome (agent)
+
+Use this when the user asks you to capture the session, and the Chrome DevTools
+MCP is available.
+
+Before you start:
+
+- The user must log in to the portal in Chrome.
+- Remote debugging must be on: `chrome://inspect/#remote-debugging`.
+- When you connect, Chrome asks the user for permission. The user clicks Allow.
+
+Steps:
+
+1. Use the MCP tool `list_pages`. Find the page with
+   `zonaprivada.edistribucion.com`.
+2. Use `list_network_requests` for that page. Filter on `xhr` and `fetch`. Find
+   a request with the path `/s/sfsites/aura`. If there is none, ask the user to
+   open the private area and click a menu item.
+3. Use `get_network_request` on that request. Read the request header `cookie`.
+4. Find `sid=` in the header. Take the value up to the next `;`. The value looks
+   like `00D...!AQEA...`.
+5. Save it:
+
+```bash
+python edistribucion.py save --sid "<sid value>"
+```
+
+Or pass the whole header:
+
+```bash
+python edistribucion.py save --text "<cookie header>"
+```
+
+6. Check the session with `python edistribucion.py status`.
+
+Do not print the `sid` value in the chat. It is a secret.
+
 ## Commands
 
 Use these commands. Do not guess new ones.
