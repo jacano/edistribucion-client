@@ -76,6 +76,7 @@ Use these commands. Do not guess new ones.
 | `python edistribucion.py month --month YYYY-MM` | consumption for one month |
 | `python edistribucion.py range --from YYYY-MM-DD --to YYYY-MM-DD` | consumption for a range |
 | `python edistribucion.py login` | open the login page and save the session |
+| `python edistribucion.py login-backend` | log in with user and password, no browser |
 
 Add `--json` to `month` or `range` to get raw JSON. Use `--json` when you need
 the data for more work.

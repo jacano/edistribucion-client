@@ -140,6 +140,49 @@ python edistribucion.py save --text "<Cookie header>"
 This option works because the MCP reads the request, not the page. The request
 carries the HttpOnly `sid` cookie. The page cannot see it. The request can.
 
+## Option 4: backend login with user and password
+
+This option logs in with the portal login call. No browser. It sends the user
+and the password to the portal.
+
+```bash
+python edistribucion.py login-backend
+```
+
+The command asks for the NIF and the password. Then it logs in and writes
+`sesion.json`.
+
+Add `--save` to store the credentials:
+
+```bash
+python edistribucion.py login-backend --save
+```
+
+The credentials go to `credenciales.json`. The password is encrypted with the
+Windows Data Protection API (DPAPI). Only your Windows user can decrypt it.
+The file holds no clear password.
+
+### Auto login
+
+When `credenciales.json` exists, auto login is on. Any command that finds the
+session expired logs in again with the stored credentials. You see this line:
+
+```
+Stored session expired. Logged in again with the stored credentials.
+```
+
+To turn auto login off, delete `credenciales.json`.
+
+Tests showed that a plain login request does not set the session. The portal
+completes the login with a redirect chain:
+
+1. The login call returns `null`, but the response holds the frontdoor URL.
+2. `frontdoor.jsp` sets the `sid` cookie.
+3. The login flow finishes on the community landing page.
+4. The home page sets the `aura.token` cookie.
+
+The tool follows this chain for you.
+
 ## Direct options
 
 You can also skip the menu.

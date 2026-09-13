@@ -1,6 +1,9 @@
 # Session cookies (secret)
 sesion.json
 
+# Encrypted credentials (secret)
+credenciales.json
+
 # Python
 __pycache__/
 *.py[cod]

@@ -15,6 +15,7 @@ How it works (Salesforce Experience Cloud / Aura):
 
 Session: sesion.json (or the EDIST_SID environment variable). Commands:
   python edistribucion.py login
+  python edistribucion.py login-backend [--save]
   python edistribucion.py save --sid "<sid cookie value>"
   python edistribucion.py status
   python edistribucion.py cups
@@ -23,6 +24,10 @@ Session: sesion.json (or the EDIST_SID environment variable). Commands:
   python edistribucion.py range --from 2026-09-01 --to 2026-09-30 [--cont <contId>] [--json]
 """
 import argparse
+import base64
+import ctypes
+import getpass
+import http.cookiejar
 import json
 import os
 import re
@@ -31,6 +36,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
+from ctypes import wintypes
 from datetime import date, datetime, timedelta
 
 BASE = "https://zonaprivada.edistribucion.com"
@@ -43,12 +49,14 @@ DETAIL_PAGE = "/areaprivada/s/wp-measure-detail-v4"
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_SESSION = os.path.join(DIR, "sesion.json")
+DEFAULT_CREDENTIALS = os.path.join(DIR, "credenciales.json")
 USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36")
 
 # Aura app framework UID for the community app (stable value).
 FWUID = "WUdfaXlIZDNDQ0lZLWNFZDMtVGZ3d2tVMjdnTGFERUU2S3FfSVdrcU92bkExNC4xOTIuODM4ODYwOA"
 APP_VERSION = "1712_xZHiuQoc1HHcvGz4vs6mGA"
+LOGIN_APP_VERSION = "1634_zEBwUiHiCUzHoP9klFUc9g"
 
 # action alias -> (URL route, server descriptor, calling component)
 ACTIONS = {
@@ -100,6 +108,150 @@ class Session:
 
     def cookie_header(self):
         return "; ".join("%s=%s" % (k, v) for k, v in self.cookies.items())
+
+
+def aura_context():
+    return json.dumps({"mode": "PROD", "fwuid": FWUID, "app": "siteforce:communityApp",
+                       "loaded": {"APPLICATION@markup://siteforce:communityApp": APP_VERSION},
+                       "dn": [], "globals": {}, "uad": True}, separators=(",", ":"))
+
+
+# ---------------------------------------------------------------- credentials
+class _DataBlob(ctypes.Structure):
+    _fields_ = [("cbData", wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_char))]
+
+
+def _to_blob(data):
+    buffer = ctypes.create_string_buffer(data, len(data))
+    return _DataBlob(len(data), ctypes.cast(buffer, ctypes.POINTER(ctypes.c_char))), buffer
+
+
+def dpapi_protect(data):
+    """Encrypt bytes with the Windows Data Protection API."""
+    if os.name != "nt":
+        raise RuntimeError("Credential encryption needs Windows.")
+    in_blob, _keep = _to_blob(data)
+    out_blob = _DataBlob()
+    ok = ctypes.windll.crypt32.CryptProtectData(
+        ctypes.byref(in_blob), None, None, None, None, 0x01, ctypes.byref(out_blob))
+    if not ok:
+        raise ctypes.WinError()
+    try:
+        return ctypes.string_at(out_blob.pbData, out_blob.cbData)
+    finally:
+        ctypes.windll.kernel32.LocalFree(out_blob.pbData)
+
+
+def dpapi_unprotect(data):
+    """Decrypt bytes that dpapi_protect made."""
+    if os.name != "nt":
+        raise RuntimeError("Credential decryption needs Windows.")
+    in_blob, _keep = _to_blob(data)
+    out_blob = _DataBlob()
+    ok = ctypes.windll.crypt32.CryptUnprotectData(
+        ctypes.byref(in_blob), None, None, None, None, 0x01, ctypes.byref(out_blob))
+    if not ok:
+        raise ctypes.WinError()
+    try:
+        return ctypes.string_at(out_blob.pbData, out_blob.cbData)
+    finally:
+        ctypes.windll.kernel32.LocalFree(out_blob.pbData)
+
+
+def save_credentials(username, password, path=DEFAULT_CREDENTIALS):
+    blob = base64.b64encode(dpapi_protect(password.encode("utf-8"))).decode("ascii")
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump({"system": "dpapi", "username": username, "password": blob}, fh, indent=2)
+    return path
+
+
+def load_credentials(path=DEFAULT_CREDENTIALS):
+    data = json.load(open(path, encoding="utf-8"))
+    if data.get("system") != "dpapi":
+        raise RuntimeError("Unknown credential storage: %s" % data.get("system"))
+    password = dpapi_unprotect(base64.b64decode(data["password"])).decode("utf-8")
+    return data.get("username"), password
+
+
+# ---------------------------------------------------------------- backend login
+def _jar_sid(jar):
+    for cookie in jar:
+        if cookie.name == "sid":
+            return cookie.value
+    return None
+
+
+def _fetch(opener, url):
+    with opener.open(urllib.request.Request(
+            url, headers={"User-Agent": USER_AGENT,
+                          "Accept": "text/html,application/xhtml+xml"}), timeout=40) as response:
+        return response.read().decode("utf-8", "replace")
+
+
+def login_context():
+    return json.dumps({"mode": "PROD", "fwuid": FWUID, "app": "siteforce:loginApp2",
+                       "loaded": {"APPLICATION@markup://siteforce:loginApp2": LOGIN_APP_VERSION},
+                       "dn": [], "globals": {}, "uad": True}, separators=(",", ":"))
+
+
+def backend_login(username, password, start_url=""):
+    """Log in with the portal login call. Return (sid, raw_response).
+
+    The login page is a guest page. Its requests use `aura.token=null`.
+    """
+    page_uri = LOGIN_PAGE + "?language=es"
+    jar = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+    request = urllib.request.Request(
+        BASE + page_uri,
+        headers={"User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml"})
+    with opener.open(request, timeout=40) as response:
+        response.read()
+
+    message = {"actions": [{"id": "1;a",
+        "descriptor": "apex://LightningLoginFormController/ACTION$login",
+        "callingDescriptor": "markup://c:WP_LoginForm",
+        "params": {"username": username, "password": password, "startUrl": start_url}}]}
+    body = urllib.parse.urlencode({
+        "message": json.dumps(message, separators=(",", ":")),
+        "aura.context": login_context(),
+        "aura.pageURI": page_uri,
+        "aura.token": "null"}).encode()
+    request = urllib.request.Request(
+        AURA_ENDPOINT + "?r=1&other.LightningLoginForm.login=1",
+        data=body, method="POST", headers={
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "Origin": BASE, "Referer": BASE + page_uri,
+            "User-Agent": USER_AGENT, "Accept": "*/*"})
+    with opener.open(request, timeout=40) as response:
+        text = response.read().decode("utf-8", "replace")
+
+    sid = _jar_sid(jar)
+    if not sid:
+        # The login action returns null. The response carries an
+        # `aura:clientRedirect` with the frontdoor URL. That URL holds the
+        # session as a query parameter. The frontdoor page then points to the
+        # login flow, which finishes on the community landing page. Follow the
+        # chain to set the session cookie.
+        match = re.search(r"https://[^\"]*frontdoor\.jsp[^\"]*", text)
+        front = None
+        if match:
+            front = match.group(0).replace("\\u0026", "&").replace("&amp;", "&")
+        if front:
+            try:
+                body = _fetch(opener, front)
+                flow = re.search(r"(?:https://[^\"']+)?(/areaprivada/loginflow/[^\"'\\ ]+)", body)
+                if flow:
+                    _fetch(opener, BASE + flow.group(1))
+            except Exception:
+                pass
+            sid = _jar_sid(jar)
+        if sid:
+            try:
+                _fetch(opener, BASE + HOME_PAGE)
+            except Exception:
+                pass
+    return sid, text
 
 
 class Client:
@@ -368,9 +520,37 @@ def build_client(args):
     return Client(Session(sid=getattr(args, "sid", None), path=args.session))
 
 
+def auto_login(args):
+    """Log in with the stored credentials when the session is not valid.
+
+    Auto login is enabled when the credentials file exists.
+    """
+    if not os.path.exists(DEFAULT_CREDENTIALS):
+        return None
+    username, password = load_credentials(DEFAULT_CREDENTIALS)
+    sid, _ = backend_login(username, password)
+    if not sid:
+        return None
+    session = Session(sid=sid, path=args.session)
+    session.save()
+    print("Stored session expired. Logged in again with the stored credentials.",
+          file=sys.stderr)
+    return Client(session)
+
+
 def load_context(args):
     client = build_client(args)
-    account = client.whoami()
+    try:
+        account = client.whoami()
+    except Exception:
+        account = None
+        try:
+            client = auto_login(args) or client
+            account = client.whoami() if client is not None else None
+        except Exception:
+            account = None
+        if account is None:
+            raise
     supplies = client.list_supplies(account["visibility_id"])
     return client, account, supplies
 
@@ -514,6 +694,44 @@ def cmd_login(args):
         sys.exit(1)
 
 
+def cmd_login_backend(args):
+    username = args.user
+    password = args.password
+    if not (username and password) and os.path.exists(args.credentials):
+        username, password = load_credentials(args.credentials)
+    if not username:
+        username = input("NIF/Pasaporte/NIE: ").strip()
+    if not password:
+        password = getpass.getpass("Password: ")
+    if not (username and password):
+        print("Need a user and a password.", file=sys.stderr)
+        sys.exit(1)
+
+    print("Logging in by backend...")
+    try:
+        sid, text = backend_login(username, password)
+    except Exception as exc:
+        print("Login request failed:", exc, file=sys.stderr)
+        sys.exit(1)
+    if not sid:
+        print("The portal did not return a session. Raw response:", file=sys.stderr)
+        print(text[:600], file=sys.stderr)
+        sys.exit(1)
+
+    session = Session(sid=sid, path=args.session)
+    session.save()
+    print("Session saved to", args.session)
+    if args.save:
+        path = save_credentials(username, password, args.credentials)
+        print("Credentials saved (encrypted with Windows DPAPI) to", path)
+    try:
+        account = Client(session).whoami()
+        print("Login OK. User:", account["name"])
+    except Exception as exc:
+        print("Session saved, but the check failed:", exc, file=sys.stderr)
+        sys.exit(1)
+
+
 def cmd_status(args):
     client, account, supplies = load_context(args)
     print(json.dumps({"name": account["name"], "supplies": len(supplies),
@@ -598,6 +816,16 @@ def build_parser():
     login.add_argument("--method", choices=["paste", "cookies", "agent"],
                        help="paste, cookies or agent")
     login.set_defaults(func=cmd_login)
+
+    backend = sub.add_parser("login-backend", parents=[common],
+                             help="log in with user and password, no browser")
+    backend.add_argument("--user", help="NIF, passport or NIE")
+    backend.add_argument("--password", help="the password (or you are asked for it)")
+    backend.add_argument("--save", action="store_true",
+                         help="store the credentials encrypted with Windows DPAPI")
+    backend.add_argument("--credentials", default=DEFAULT_CREDENTIALS,
+                         help="path to the credentials file")
+    backend.set_defaults(func=cmd_login_backend)
 
     sub.add_parser("status", parents=[common],
                    help="account and supplies").set_defaults(func=cmd_status)
