@@ -6,8 +6,9 @@ to give it. All of them write the file `sesion.json`.
 ## `login` (recommended)
 
 This command opens the portal and reads the session from your running Chrome
-with the DevTools Protocol. It does not launch a new browser. The DevTools
-Protocol sees HttpOnly cookies, so no code injection is needed.
+with the DevTools Protocol. It uses your normal Chrome. You do not set any port
+or flag, and no new browser opens. The DevTools Protocol sees HttpOnly cookies,
+so no code injection is needed.
 
 Turn on remote debugging one time in Chrome:
 
