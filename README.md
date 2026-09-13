@@ -28,15 +28,18 @@ POST requests to `/s/sfsites/aura`.
 
 ## Authentication
 
-The tool supports three ways to get the session. The full steps are in
-[AUTHENTICATION.md](AUTHENTICATION.md).
+Start with the `login` command. It opens the e-distribucion login page. Then it
+offers three ways to return the session to the tool:
 
-1. Import a cookies file. Export `cookies.txt` with a browser extension, then
-   run `import-cookies`.
-2. Pass the session as an argument. Use the `--sid` option or the `save`
-   command.
-3. Use the MCP. The agent reads the `sid` with the Chrome DevTools MCP, then
-   calls the tool `edist_save_session`.
+1. Paste a line from DevTools (the `Cookie` header, or "Copy as cURL").
+2. Import a `cookies.txt` file.
+3. Let the agent read the session with the Chrome MCP.
+
+Full steps are in [AUTHENTICATION.md](AUTHENTICATION.md).
+
+```bash
+python edistribucion.py login
+```
 
 ## Commands
 

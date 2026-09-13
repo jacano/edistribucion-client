@@ -14,6 +14,7 @@ How it works (Salesforce Experience Cloud / Aura):
     message / aura.context / aura.pageURI / aura.token.
 
 Session: sesion.json (or the EDIST_SID environment variable). Commands:
+  python edistribucion.py login
   python edistribucion.py save --sid "<sid cookie value>"
   python edistribucion.py status
   python edistribucion.py cups
@@ -385,27 +386,59 @@ def cmd_import_cookies(args):
     print("sid found:", "yes" if session.cookies.get("sid") else "no")
 
 
+COOKIE_NAMES = ("sid", "oid", "sid_Client", "inst", "clientSrc")
+
+
+def extract_cookies_from_text(text):
+    """Find cookie pairs in a Cookie header or a cURL line."""
+    found = {}
+    for name in COOKIE_NAMES:
+        match = re.search(r"(?:^|[;\s'\"]|:)%s=([^;'\"\s]+)" % re.escape(name), text)
+        if match:
+            found[name] = match.group(1)
+    return found
+
+
 def cmd_login(args):
     print("Opening the login page in your browser...")
     webbrowser.open(BASE + LOGIN_PAGE)
     print()
-    print("After you log in, copy the sid cookie value:")
-    print("  DevTools > Application > Cookies > zonaprivada.edistribucion.com > sid")
-    print()
-    sid = args.sid or os.environ.get("EDIST_SID")
-    if not sid:
-        sid = input("Paste the sid value and press Enter: ").strip()
-    if not sid:
-        print("No value given. Nothing saved.", file=sys.stderr)
+    print("Log in to the portal. Then choose how to return the session:")
+    print("  1. Paste a line from DevTools (the Cookie header, or 'Copy as cURL').")
+    print("  2. Import a cookies.txt file.")
+    print("  3. Let the agent read it with the Chrome MCP.")
+    method = args.method or (input("Choose 1, 2 or 3 [1]: ").strip() or "1")
+
+    session = Session(path=args.session)
+    if method == "1":
+        text = input("Paste the Cookie header or cURL line: ").strip()
+        cookies = extract_cookies_from_text(text)
+        if not cookies.get("sid"):
+            print("No sid found in the text.", file=sys.stderr)
+            sys.exit(1)
+        session.cookies.update(cookies)
+    elif method == "2":
+        path = input("Path to cookies.txt [cookies.txt]: ").strip() or "cookies.txt"
+        cookies = parse_cookies_file(path)
+        if not cookies.get("sid"):
+            print("No sid found in", path, file=sys.stderr)
+            sys.exit(1)
+        session.cookies.update(cookies)
+    elif method == "3":
+        print("Ask the agent: 'save my e-distribucion session'.")
+        print("The agent uses the Chrome MCP and calls the tool edist_save_session.")
+        return
+    else:
+        print("Unknown method:", method, file=sys.stderr)
         sys.exit(1)
-    session = Session(sid=sid, path=args.session)
+
     session.save()
     print("Session saved to", args.session)
     try:
         account = Client(session).whoami()
         print("Login OK. User:", account["name"])
     except Exception as exc:
-        print("Could not verify the session:", exc, file=sys.stderr)
+        print("Session saved, but the check failed:", exc, file=sys.stderr)
         sys.exit(1)
 
 
@@ -497,7 +530,9 @@ def build_parser():
     imp.set_defaults(func=cmd_import_cookies)
 
     login = sub.add_parser("login", parents=[common],
-                           help="open the login page and save the sid cookie")
+                           help="open the login page and save the session")
+    login.add_argument("--method", choices=["1", "2", "3"],
+                       help="1 paste, 2 cookies file, 3 agent")
     login.set_defaults(func=cmd_login)
 
     sub.add_parser("status", parents=[common],
