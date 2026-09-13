@@ -57,7 +57,7 @@ for each CUPS of the account, one after another. It contains:
   real and estimated values,
 - the maximum consumption in one hour per year,
 - the maximum demanded power per year and per month,
-- a warning when estimated data exists, with the dates.
+- the dates of the estimated data, when it exists.
 
 Option:
 

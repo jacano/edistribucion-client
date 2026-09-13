@@ -883,18 +883,18 @@ def _groups_list(group_dict):
 
 
 def _max_demand(client, account, cups_id, year_from, year_to):
+    """Return the maximum demanded power per month, with the date and the hour."""
     monthly = {}
     for year in range(year_from, year_to + 1):
         data = client.get_maximeter(cups_id, account["visibility_id"], "1/%d" % year, "12/%d" % year)
         for point in data.get("lstData", []):
-            if point.get("valid"):
-                monthly[point["date"]] = point["value"]
+            if not point.get("valid"):
+                continue
+            date = point.get("date") or ""
+            parts = date.split("-")
+            key = "%s-%s" % (parts[2], parts[1]) if len(parts) == 3 else date
+            monthly[key] = {"kw": point.get("value"), "date": date, "hour": point.get("hour")}
     return monthly
-
-
-def hours_days(hours):
-    """Return the hours and the same time in days, for example 15911 hours (663 days)."""
-    return "%d hours (%d days)" % (hours, round(hours / 24.0))
 
 
 def _print_kwh_table(title, key_label, rows, total):
@@ -989,17 +989,16 @@ def _print_report(result):
         peak_kwh = "%.3f kWh" % peak["kwh"] if peak else "-"
         peak_when = "%s %s" % (peak["date"], peak["hour"]) if peak else "-"
         power_kw = "%.3f kW" % power["kw"] if power else "-"
-        power_when = power["date"].replace("-", "/") if power else "-"
+        power_when = ("%s %s" % (power["date"].replace("-", "/"), power["hour"])
+                      if power else "-")
         print("  %-4s  %10s  %-20s  %11s  %s"
               % (year, peak_kwh, peak_when, power_kw, power_when))
     print()
     if result["has_estimated"]:
-        print("WARNING: there are estimated consumptions.")
-        print("  Estimated:", result["estimated_kwh"], "kWh in",
-              hours_days(result["estimated_hours"]))
-        print("  Estimated dates:", ", ".join(result["estimated_days"]))
+        print("ESTIMATED DATES")
+        print("  " + ", ".join(result["estimated_days"]))
     else:
-        print("No estimated consumptions. All data is real.")
+        print("No estimated data. All the data is real.")
 
 
 def cmd_report(args):
@@ -1029,10 +1028,10 @@ def cmd_report(args):
         monthly_power = _max_demand(client, account, current["cups_id"],
                                     data["from"].year, data["to"].year)
         year_power = {}
-        for date_str, value in monthly_power.items():
-            year = int(date_str.split("-")[2])
-            if year not in year_power or value > year_power[year][0]:
-                year_power[year] = (value, date_str)
+        for month_key, info in monthly_power.items():
+            year = int(month_key.split("-")[0])
+            if year not in year_power or info["kw"] > year_power[year]["kw"]:
+                year_power[year] = info
         result = {
             "cups": cups,
             "tariff": tariff,
@@ -1059,8 +1058,7 @@ def cmd_report(args):
                                    for y, v in sorted(data["year_peak"].items())},
             "max_hourly_by_month": {k: {"kwh": round(v[0], 3), "date": v[1], "hour": v[2]}
                                     for k, v in sorted(data["month_peak"].items())},
-            "max_demand_by_year": {str(y): {"kw": v[0], "date": v[1]}
-                                   for y, v in sorted(year_power.items())},
+            "max_demand_by_year": {str(y): v for y, v in sorted(year_power.items())},
             "max_demand_by_month": monthly_power,
         }
         reports.append(result)

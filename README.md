@@ -106,12 +106,11 @@ CONSUMPTION
 
 MAXIMUM PER YEAR
   Year   Peak hour  When                  Peak demand  When
-  2024   3.330 kWh  15/12/2024 10 - 11 h     4.760 kW  28/10/2024
-  2025   3.625 kWh  02/02/2025 21 - 22 h     5.024 kW  20/02/2025
+  2024   3.330 kWh  15/12/2024 10 - 11 h     4.760 kW  28/10/2024 22:15
+  2025   3.625 kWh  02/02/2025 21 - 22 h     5.024 kW  20/02/2025 21:45
 
-WARNING: there are estimated consumptions.
-  Estimated: 2742.983 kWh in 7438 hours (310 days)
-  Estimated dates: 2024-03-02..2024-04-03, ...
+ESTIMATED DATES
+  2024-03-02..2024-04-03, ...
 ```
 
 The tool asks the portal for one zip with the hourly curves and reads it. Then
