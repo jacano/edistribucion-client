@@ -47,6 +47,7 @@ Use these commands. Do not guess new ones.
 | `python edistribucion.py month --month YYYY-MM` | consumption for one month |
 | `python edistribucion.py range --from YYYY-MM-DD --to YYYY-MM-DD` | consumption for a range |
 | `python edistribucion.py total --real-only` | aggregate real consumption over the full history |
+| `python edistribucion.py maxpower` | maximum demanded power per month |
 | `python edistribucion.py login-backend` | log in with user and password, no browser |
 | `python edistribucion.py import-cookies` | import a cookies.txt |
 | `python edistribucion.py save --sid` | store a session value by hand |
@@ -93,6 +94,18 @@ Use `python edistribucion.py total --real-only` to sum the whole history.
 - `--real-only` counts measured hours only. Without it, the total includes all
   methods.
 - Use `--from` and `--to` to limit the period. Use `--cont` to pick one supply.
+
+## Maximum demanded power
+
+Use `python edistribucion.py maxpower`. By default it covers the last 12 months.
+
+- `requestedPower` is the contracted power.
+- `maxValue` is the single maximum, with the date and the time.
+- `lstData` has one point per month. A point with `valid: false` means no data.
+- A valid point has `value` (the monthly maximum in kW) and `periodData` with
+  the per-period maxima (T1, T2, T3). T1 is P1, T2 is P2, T3 is P3.
+
+Options: `--from YYYY-MM`, `--to YYYY-MM`, `--cont`, `--json`.
 
 ## Rules for your answer
 

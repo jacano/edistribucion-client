@@ -62,6 +62,9 @@ python edistribucion.py range --from 2026-09-01 --to 2026-09-30
 # Full history, measured hours only.
 python edistribucion.py total --real-only
 
+# Maximum demanded power per month.
+python edistribucion.py maxpower
+
 # JSON output.
 python edistribucion.py month --month 2026-09 --json
 ```

@@ -23,6 +23,7 @@ Session: session.json (or the EDIST_SID environment variable). Commands:
   python edistribucion.py month --month 2026-09 [--cont <contId>] [--json]
   python edistribucion.py range --from 2026-09-01 --to 2026-09-30 [--cont <contId>] [--json]
   python edistribucion.py total [--from 2024-01-16] [--to 2026-09-12] [--real-only] [--json]
+  python edistribucion.py maxpower [--from 2025-08] [--to 2026-08] [--cont <contId>] [--json]
 """
 import argparse
 import base64
@@ -46,6 +47,7 @@ HOME_PAGE = "/areaprivada/s/"
 LOGIN_PAGE = "/areaprivada/s/login/"
 MEASURELIST_PAGE = "/areaprivada/s/wp-measurelist-v4"
 DETAIL_PAGE = "/areaprivada/s/wp-measure-detail-v4"
+MAXPOWER_PAGE = "/areaprivada/s/wp-maximeterhistogramdetail"
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_SESSION = os.path.join(DIR, "session.json")
@@ -72,6 +74,9 @@ ACTIONS = {
     "curve": ("WP_Measure_v3_CTRL.getChartPointsByRange",
               "apex://WP_Measure_v3_CTRL/ACTION$getChartPointsByRange",
               "markup://c:WP_Measure_Detail_Filter_By_Dates_v3"),
+    "maximeter": ("WP_MaximeterHistogram_CTRL.getHistogramPoints",
+                  "apex://WP_MaximeterHistogram_CTRL/ACTION$getHistogramPoints",
+                  "markup://c:WP_MaximeterHistogramDetail"),
 }
 
 METHODS = {"R": "measured", "E": "estimated", "C": "calculated"}
@@ -341,6 +346,7 @@ class Client:
             supplies.append({
                 "contract_id": contract.get("Id"),
                 "cups": cups.get("Name"),
+                "cups_id": cups.get("Id"),
                 "tariff": contract.get("Tariff_Code_Description__c"),
                 "type_pm": contract.get("Type_PM__c"),
                 "start": contract.get("Version_start_date__c"),
@@ -363,6 +369,12 @@ class Client:
             page = "%s?aId=%s&vis=%s" % (DETAIL_PAGE, contract_id, visibility_id)
         params = {"contId": contract_id, "type": "4", "startDate": date_from, "endDate": date_to}
         return self.call("curve", params, page).get("data", {})
+
+    def get_maximeter(self, cups_id, visibility_id, start_date, end_date):
+        page = "%s?aId=%s&sId=%s" % (MAXPOWER_PAGE, cups_id, visibility_id)
+        params = {"mapParams": {"startDate": start_date, "endDate": end_date,
+                                "id": cups_id, "sIdentificador": visibility_id}}
+        return self.call("maximeter", params, page).get("data", {})
 
 
 # ---------------------------------------------------------------- parsing
@@ -840,6 +852,48 @@ def cmd_total(args):
     print("By year:", result["by_year_kwh"])
 
 
+def cmd_maxpower(args):
+    client, account, supplies = load_context(args)
+    contract = default_contract(account, supplies, args.cont)
+    supply = next((item for item in supplies if item["contract_id"] == contract), supplies[0])
+    cups_id = supply.get("cups_id")
+    if not cups_id:
+        print("No CUPS id for the contract.", file=sys.stderr)
+        sys.exit(1)
+
+    if args.date_to:
+        year, month = [int(part) for part in args.date_to.split("-")[:2]]
+    else:
+        today = date.today()
+        year, month = today.year, today.month
+    end = "%d/%d" % (month, year)
+    if args.date_from:
+        y0, m0 = [int(part) for part in args.date_from.split("-")[:2]]
+    else:
+        total = year * 12 + (month - 1) - 11
+        y0, m0 = total // 12, total % 12 + 1
+    start = "%d/%d" % (m0, y0)
+
+    data = client.get_maximeter(cups_id, account["visibility_id"], start, end)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return
+
+    print("CUPS:", data.get("cups"), "| contractId:", contract)
+    print("Period:", start, "->", end)
+    print("Contracted power:", data.get("requestedPower"), "kW")
+    print("Maximum:", data.get("maxValue"))
+    print("Monthly maxima:")
+    for point in data.get("lstData", []):
+        if not point.get("valid"):
+            print("  %s  no data" % point.get("date"))
+            continue
+        periods = point.get("periodData") or {}
+        period_txt = " ".join("P%s=%s" % (key[1:], value.get("fmtVal"))
+                              for key, value in periods.items() if value.get("val"))
+        print("  %s  %s kW  %s" % (point.get("date"), point.get("value"), period_txt))
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         description="Unofficial HTTP-only client for e-distribucion (no browser)")
@@ -901,6 +955,14 @@ def build_parser():
                        help="count measured hours only")
     total.add_argument("--json", action="store_true")
     total.set_defaults(func=cmd_total)
+
+    mp = sub.add_parser("maxpower", parents=[common],
+                        help="maximum demanded power per month")
+    mp.add_argument("--from", dest="date_from", help="YYYY-MM")
+    mp.add_argument("--to", dest="date_to", help="YYYY-MM")
+    mp.add_argument("--cont")
+    mp.add_argument("--json", action="store_true")
+    mp.set_defaults(func=cmd_maxpower)
     return parser
 
 
