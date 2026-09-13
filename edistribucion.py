@@ -118,6 +118,9 @@ ACTIONS = {
 # off-peak.
 FIXED_HOLIDAYS = {(1, 1), (1, 6), (5, 1), (8, 15), (10, 12), (11, 1), (12, 6), (12, 8), (12, 25)}
 
+# This tool only knows the 2.0TD tariff (three periods: P1, P2, P3).
+SUPPORTED_TARIFF = "2.0"
+
 
 def log(message):
     """Write a progress line to stderr, so stdout stays clean."""
@@ -739,15 +742,22 @@ def _compress_dates(days):
     return out
 
 
-def _download_measure_zip(client, account, contracts):
+def measure_tariff(listing, contracts):
+    """Return the tariff name of a contract group, from the measure list."""
+    wanted = {item["contract_id"] for item in contracts}
+    for row in listing.get("lstCups") or []:
+        if row.get("Id") in wanted and row.get("rate"):
+            return row["rate"]
+    return None
+
+
+def _download_measure_zip(client, account, contracts, listing):
     """Ask the portal for one zip with all the hourly curves of a CUPS.
 
     The portal makes the zip in the background. This waits until the file
     appears in the download list, then returns its bytes.
     """
     visibility = account["visibility_id"]
-    log("Asking the portal for the hourly curves...")
-    listing = client.list_measure_cups(visibility).get("data") or {}
     wanted = {item["contract_id"] for item in contracts}
     contract_ids = [value for value in (listing.get("lstIds") or []) if value in wanted]
     records = [row for row in (listing.get("lstCups") or []) if row.get("Id") in wanted]
@@ -781,7 +791,7 @@ def _download_measure_zip(client, account, contracts):
     raise RuntimeError("The portal did not make the zip in time.")
 
 
-def collect_consumption(client, account, contracts):
+def collect_consumption(client, account, contracts, listing):
     """Read the full history from the zip and return the aggregates."""
     groups = {"year": {}, "month": {}, "hour": {}}
     periods_real = {"P1": 0.0, "P2": 0.0, "P3": 0.0}
@@ -799,7 +809,7 @@ def collect_consumption(client, account, contracts):
         return groups[group].setdefault(key, {"real_kwh": 0.0, "estimated_kwh": 0.0,
                                               "real_hours": 0, "estimated_hours": 0})
 
-    payload = _download_measure_zip(client, account, contracts)
+    payload = _download_measure_zip(client, account, contracts, listing)
     if payload:
         for day, hour, kwh, real in zip_hours(payload):
             key = (day, hour)
@@ -884,7 +894,8 @@ def _max_demand(client, account, cups_id, year_from, year_to):
 
 def _print_report(result):
     print("REPORT")
-    print("CUPS:", result["cups"], "| cups_id:", result["cups_id"])
+    print("CUPS:", result["cups"])
+    print("Tariff:", result["tariff"])
     print("Contracted power:", result["contracted_power_kw"], "kW")
     print("Period:", result["from"], "->", result["to"])
     print()
@@ -937,7 +948,13 @@ def cmd_report(args):
         group = [item for item in supplies if item["cups"] == cups]
         current = next((item for item in group if not item.get("end")), group[-1])
         log("CUPS %s" % cups)
-        data = collect_consumption(client, account, group)
+        log("Reading the tariff...")
+        listing = client.list_measure_cups(visibility).get("data") or {}
+        tariff = measure_tariff(listing, group)
+        if tariff and not tariff.startswith(SUPPORTED_TARIFF):
+            raise RuntimeError("Unsupported tariff: %s. This tool supports 2.0TD only."
+                               % tariff)
+        data = collect_consumption(client, account, group, listing)
         if not data["from"]:
             log("  No data for this CUPS.")
             continue
@@ -954,7 +971,7 @@ def cmd_report(args):
                 year_power[year] = (value, date_str)
         result = {
             "cups": cups,
-            "cups_id": current["cups_id"],
+            "tariff": tariff,
             "contracted_power_kw": contracted,
             "from": data["from"].isoformat(),
             "to": data["to"].isoformat(),

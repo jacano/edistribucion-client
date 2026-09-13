@@ -50,7 +50,7 @@ edistribucion
 This is the full report. It uses all the data available. It gives one report
 for each CUPS of the account, one after another. It contains:
 
-- the CUPS id and the contracted power per period,
+- the CUPS, the tariff, and the contracted power per period,
 - the real period used,
 - the real and estimated totals and the split by `P1`, `P2`, `P3`,
 - the consumption by year (with the P1, P2, P3 split), month, and hour, with
@@ -70,8 +70,8 @@ The tool asks the portal for one zip with the hourly curves (action
 `createZip`), waits for it, and reads it. Then it deletes the zip. The period
 (P1, P2, P3) comes from the 2.0TD calendar, not from a data call.
 
-The first and the last date depend on the account. The tool finds them by
-itself. Do not promise a start date.
+The report shows the tariff. When the tariff is not 2.0TD, the tool stops with
+an error and gives no report data.
 
 See `docs/ASSUMPTIONS.md` for the full list of assumptions and limits.
 

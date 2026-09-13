@@ -7,6 +7,7 @@ standard library.
 It gives one thing: a **full report**. The report uses all the data available
 and covers every CUPS of the account, one after another. Each report contains:
 
+- the tariff of the supply,
 - the contracted power per period (P1, P2),
 - the real and estimated consumption totals and the split by P1, P2, P3,
 - the real and estimated consumption by year (with the P1, P2, P3 split),
@@ -89,7 +90,8 @@ Example output:
 
 ```
 REPORT
-CUPS: ES0031102226226018WR0F | cups_id: a0r2400000GIpw1AAD
+CUPS: ES0031102226226018WR0F
+Tariff: 2.0TD
 Contracted power: {'P1': 4.0, 'P2': 4.0} kW
 Period: 2024-01-16 -> 2026-09-14
 
@@ -123,12 +125,11 @@ WARNING: there are estimated consumptions.
 The tool asks the portal for one zip with the hourly curves and reads it. Then
 it deletes the zip from the portal. This is much faster than one call per month.
 The period (P1, P2, P3) is worked out from the 2.0TD calendar. All the details
-are in [docs/TARIFF_2_0TD.md](docs/TARIFF_2_0TD.md). The first and the last date
-depend on the account; the tool finds them by itself.
+are in [docs/TARIFF_2_0TD.md](docs/TARIFF_2_0TD.md).
 
-The tool works for a 2.0TD supply in the Peninsula, Illes Balears or Canarias.
-Other tariffs, and Ceuta and Melilla, need more work. The full list of
-assumptions and limits is in [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md).
+The report shows the tariff. When the tariff is not 2.0TD, the tool stops with
+an error and gives no report data. The full list of assumptions and limits is
+in [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md).
 
 ## Security
 

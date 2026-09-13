@@ -128,8 +128,7 @@ The portal sends the period of each hour in the data of the old method. The
 tool compared its own period with the period of the portal. The test used one
 real 2.0TD account (Sevilla).
 
-- The test compared 23,322 hours, from 2024-01-16 to 2026-09-14. Those dates
-  come from that account, not from a rule of the portal.
+- The test compared 23,322 hours, the full history of that account.
 - The real/estimated flag: 0 differences.
 - The consumption in kWh: the same in every hour.
 - The period: the same in every hour, when the tool used the 9 fixed holidays.
