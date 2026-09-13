@@ -20,27 +20,31 @@ This file tells an LLM agent what this tool is and how to use it.
 
 ## Before you run it
 
-- Run commands from the folder that holds `edistribucion.py`.
-- The tool needs the session file `session.json`.
+- Install the tool with `pip install .` or `pipx install .`. This gives the
+  `edistribucion` command.
+- You can also run the file: `python edistribucion.py`.
+- The tool needs the session file `session.json`. The tool looks for it in the
+  folder of the file, the current folder, and the user config folder.
 - If the report fails with an authentication error, the session expired. Tell
-  the user to run `python edistribucion.py login-backend`, or let the auto login
-  do it. See `AUTHENTICATION.md`.
+  the user to run `edistribucion login-backend`, or let the auto login do it.
+  See `AUTHENTICATION.md`.
 
 ## Commands
 
 | command | what it does |
 | --------- | ------------ |
-| `python edistribucion.py report` | full report for every CUPS, all data |
-| `python edistribucion.py login-backend` | log in with user and password, no browser |
-| `python edistribucion.py import-cookies` | import a cookies.txt |
-| `python edistribucion.py save --sid` | store a session value by hand |
+| `edistribucion` | full report for every CUPS, all data |
+| `edistribucion report` | the same as `edistribucion` |
+| `edistribucion login-backend` | log in with user and password, no browser |
+| `edistribucion import-cookies` | import a cookies.txt |
+| `edistribucion save --sid` | store a session value by hand |
 
 The options `--sid` and `--session` go before or after the command.
 
 ## report
 
 ```bash
-python edistribucion.py report
+edistribucion
 ```
 
 This is the full report. It uses all the data available. It gives one report

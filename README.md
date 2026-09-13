@@ -22,6 +22,38 @@ Endesa. Use it only with your own account. The portal can change at any time.
 
 - Python 3.9 or newer.
 
+## Install as a tool
+
+Install the tool and get the `edistribucion` command:
+
+```bash
+pipx install .
+# or
+pip install .
+```
+
+Then run the report:
+
+```bash
+edistribucion          # the same as: edistribucion report
+edistribucion report
+edistribucion report --json
+```
+
+You can also run the file without installing it:
+
+```bash
+python edistribucion.py report
+```
+
+The tool keeps the session and the credentials in one of these places, in this
+order:
+
+- the folder of the file (the source layout),
+- the current folder,
+- the user config folder (`%APPDATA%\edistribucion` on Windows,
+  `~/.config/edistribucion` on Linux and macOS).
+
 ## Authentication
 
 Get the session with one of these commands. Full steps are in
@@ -34,13 +66,14 @@ Get the session with one of these commands. Full steps are in
 - `save --sid` stores a value that you already have.
 
 ```bash
-python edistribucion.py login-backend
+edistribucion login-backend --save      # installed tool
+python edistribucion.py login-backend   # file, without installing
 ```
 
 ## Report
 
 ```bash
-python edistribucion.py report
+edistribucion report
 ```
 
 The report uses all the data available. You do not set a period. The tool finds

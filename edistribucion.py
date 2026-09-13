@@ -54,8 +54,26 @@ MAXPOWER_PAGE = "/areaprivada/s/wp-maximeterhistogramdetail"
 ATR_PAGE = "/areaprivada/s/wp-atrcontractdetail"
 
 DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_SESSION = os.path.join(DIR, "session.json")
-DEFAULT_CREDENTIALS = os.path.join(DIR, "credentials.json")
+
+
+def state_path(name):
+    """Return the path of a local state file (the session, the credentials).
+
+    Use a file next to the script or in the current folder when it exists, so
+    the source layout keeps its files. Else use the user config folder, so an
+    installed tool can write the files outside its package.
+    """
+    for folder in (DIR, os.getcwd()):
+        beside = os.path.join(folder, name)
+        if os.path.exists(beside):
+            return beside
+    base = (os.environ.get("APPDATA") or os.environ.get("XDG_CONFIG_HOME")
+            or os.path.join(os.path.expanduser("~"), ".config"))
+    return os.path.join(base, "edistribucion", name)
+
+
+DEFAULT_SESSION = state_path("session.json")
+DEFAULT_CREDENTIALS = state_path("credentials.json")
 USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36")
 
@@ -991,8 +1009,11 @@ def build_parser():
     return parser
 
 
-def main():
-    args = build_parser().parse_args()
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if not argv:
+        argv = ["report"]
+    args = build_parser().parse_args(argv)
     try:
         args.func(args)
     except Exception as exc:

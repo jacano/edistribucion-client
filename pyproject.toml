@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "edistribucion-client"
+version = "1.0.0"
+description = "HTTP-only client to read your e-distribucion electricity consumption (unofficial)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "jacano" }]
+keywords = ["edistribucion", "endesa", "electricity", "consumption"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/jacano/edistribucion-client"
+
+[project.scripts]
+edistribucion = "edistribucion:main"
+
+[tool.setuptools]
+py-modules = ["edistribucion"]
