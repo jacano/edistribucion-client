@@ -1,10 +1,14 @@
 # e-distribucion client
 
-This tool reads your electricity consumption from the e-distribucion private
-area (Endesa group). It uses HTTP only. It runs in the terminal. It is friendly
-for LLM agents. See [AGENTS.md](AGENTS.md).
+This tool reads electricity data from the e-distribucion private area (Endesa
+group) for your own account. It uses HTTP only. It uses only the Python
+standard library.
 
-The client uses only the Python standard library.
+It does three things:
+
+1. Show the maximum demanded power per month.
+2. Aggregate real consumption by hour, day, month, or year.
+3. Find non-real (estimated) data and when it happens.
 
 Warning: this tool is not official. It is not connected to e-distribucion or
 Endesa. Use it only with your own account. The portal can change at any time.
@@ -12,15 +16,8 @@ Endesa. Use it only with your own account. The portal can change at any time.
 ## How it works
 
 The portal is a Salesforce Experience Cloud site. The session is the `sid`
-cookie.
-
-The portal also needs an anti-CSRF token. The token name is `aura.token`. You
-do not decode this token. The server sends the token in the `Set-Cookie`
-header `__Host-ERIC_PROD...=eyJ...` each time a community page loads. The client
-reads the token there and uses it again.
-
-The flow has two steps. One GET request gets a token. Then the client sends
-POST requests to `/s/sfsites/aura`.
+cookie. The tool also needs a short-lived anti-CSRF token. The server sends that
+token in a cookie on the first request. The tool copies it and reuses it.
 
 ## Requirements
 
@@ -44,29 +41,25 @@ python edistribucion.py login-backend
 ## Commands
 
 ```bash
-# Account and supplies. Shows the contracted power.
-python edistribucion.py status
-
-# Full supply list with all fields.
+# List supplies. Shows the CUPS id and the contracted power.
 python edistribucion.py cups
 
-# Billing periods, contracts, and the available date range.
-python edistribucion.py periods
+# Aggregate consumption by day (default).
+python edistribucion.py consume
 
-# Consumption for one month. Splits P1, P2 and P3. Marks real or estimated.
-python edistribucion.py month --month 2026-09
+# Aggregate by hour of the day, month, or year.
+python edistribucion.py consume --group hour
+python edistribucion.py consume --group month
+python edistribucion.py consume --group year
 
-# Consumption for a date range.
-python edistribucion.py range --from 2026-09-01 --to 2026-09-30
-
-# Full history, measured hours only.
-python edistribucion.py total --real-only
+# Limit the period.
+python edistribucion.py consume --from 2024-01-16 --to 2026-09-12 --group month
 
 # Maximum demanded power per month.
 python edistribucion.py maxpower
 
 # JSON output.
-python edistribucion.py month --month 2026-09 --json
+python edistribucion.py consume --group year --json
 ```
 
 The options `--sid` and `--session` go before or after the command.
@@ -74,51 +67,43 @@ The options `--sid` and `--session` go before or after the command.
 Example output:
 
 ```
-Month 2026-09 (available 2026-09-04 -> 2026-09-12)
-CUPS: ES0031...WR0F | contractId: a0ucj...
-Range: 2026-09-04 -> 2026-09-12
-Contracted power: {'P1': 4.0} kW
-Total: 73.411 kWh | peak demand: 14.683000000000002 kW
-Periods (kWh): {'P3': 28.395, 'P2': 20.779, 'P1': 24.237}
-Measured: 73.411 kWh (216 h) | Estimated: 0.0 kWh (0 h)
-
-Daily detail:
-  04/09/2026     2.336 kWh  MEASURED  {'P3': 0.781, 'P2': 0.783, 'P1': 0.772}
+Period: 2024-01-16 -> 2026-09-12 | group: month
+Real: 5797.054 kWh (15911 h) | Estimated: 2743.035 kWh (7390 h)
+Real periods: {'P1': 1890.896, 'P2': 1704.069, 'P3': 2202.089}
+Estimated dates: 2024-03-02..2024-04-03, 2025-07-23..2025-12-09, ...
+By month (real kWh | estimated kWh):
+  2024-01        123.456 |      0.000
   ...
-  12/09/2026    12.258 kWh  MEASURED  {'P3': 12.258}
 ```
 
 ## Output fields
 
-Each hour has these fields.
+`consume` returns these keys:
 
-| field      | meaning                                  |
-| ---------- | ---------------------------------------- |
-| `kwh`      | consumption for the hour                 |
-| `period`   | tariff period: `P1`, `P2`, or `P3`       |
-| `method`   | `measured` (R) or `estimated` (E)        |
-| `real`     | true when the value is a real measure    |
-| `invoiced` | true when the value is already invoiced  |
-| `valid`    | true when the hour is valid              |
+| key | meaning |
+| --- | ------- |
+| `real_kwh` | total measured consumption |
+| `estimated_kwh` | total estimated consumption |
+| `real_hours`, `estimated_hours` | count of measured and estimated hours |
+| `periods_real_kwh` | measured total by `P1`, `P2`, `P3` |
+| `estimated_days` | the dates with estimated data |
+| `groups` | one entry per group, with real and estimated values |
 
-The command `cups` shows the contracted power for each supply. Example:
-`{"P1": 4.0}`.
+`maxpower` returns these keys:
 
-## Session
-
-The `sid` session ends after some time. If a command fails with an
-authentication error, get a new `sid`. See
-[AUTHENTICATION.md](AUTHENTICATION.md).
-
-The client refreshes the `aura.token` on each call. The token lives about 60
-seconds.
+| key | meaning |
+| --- | ------- |
+| `requestedPower` | the contracted power in kW |
+| `maxValue` | the single maximum, with the date and the time |
+| `lstData` | one point per month, with the maxima per period |
 
 ## Security
 
-The file `session.json` holds your live session cookie. The `.gitignore` file
-excludes this file. Do not commit it. Do not share it.
+The file `session.json` holds your live session cookie. The file
+`credentials.json` holds the encrypted password. The `.gitignore` file excludes
+both. Do not commit them. Do not share them.
 
-The client reads data from your own account only.
+The tool reads data from your own account only.
 
 ## License
 

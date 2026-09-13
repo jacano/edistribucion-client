@@ -12,20 +12,13 @@ This file tells an LLM agent what this tool is and how to use it.
 
 ## What this tool is
 
-- `edistribucion.py` is a command line tool.
-- It reads electricity consumption from the e-distribucion private area
-  (Endesa group) for the user's own account.
+- `edistribucion.py` reads electricity data from the e-distribucion private area
+  for the user's own account.
 - It uses HTTP only. It uses no browser and no third-party package.
-- It talks to the portal with the saved session cookie.
-
-## When to use it
-
-Use it when the user asks for:
-
-- their electricity consumption (kWh) for a month or a date range,
-- the split by tariff period P1, P2, P3,
-- whether the values are measured or estimated,
-- their supplies (CUPS) and the contracted power.
+- It does three things:
+  1. Show the maximum demanded power per month.
+  2. Aggregate real consumption by hour, day, month, or year.
+  3. Find non-real (estimated) data and when it happens.
 
 ## Before you run it
 
@@ -41,110 +34,80 @@ Use these commands. Do not guess new ones.
 
 | command | what it does |
 | --------- | ------------ |
-| `python edistribucion.py status` | account and supplies with contracted power |
-| `python edistribucion.py cups` | full supply list |
-| `python edistribucion.py periods` | contracts and the available date range |
-| `python edistribucion.py month --month YYYY-MM` | consumption for one month |
-| `python edistribucion.py range --from YYYY-MM-DD --to YYYY-MM-DD` | consumption for a range |
-| `python edistribucion.py total --real-only` | aggregate real consumption over the full history |
+| `python edistribucion.py cups` | list supplies, with the contracted power and the CUPS id |
+| `python edistribucion.py consume --group month` | aggregate consumption by hour, day, month, or year |
 | `python edistribucion.py maxpower` | maximum demanded power per month |
 | `python edistribucion.py login-backend` | log in with user and password, no browser |
 | `python edistribucion.py import-cookies` | import a cookies.txt |
 | `python edistribucion.py save --sid` | store a session value by hand |
 
-Add `--json` to `month` or `range` to get raw JSON. Use `--json` when you need
-the data for more work.
-
-Add `--cont <contractId>` to pick a supply. Without it, the tool uses the open
-contract. The command `cups` shows each `contract_id`.
-
 The options `--sid` and `--session` go before or after the command.
 
-## What the output means
+## consume
 
-The summary has these keys:
+```bash
+python edistribucion.py consume --from 2024-01-16 --to 2026-09-12 --group month
+```
+
+- `--group` is `hour`, `day`, `month`, or `year`. The default is `day`.
+- `hour` groups by hour of the day (00 to 23).
+- `--from` and `--to` are `YYYY-MM-DD`. Without them, it covers the full
+  history.
+- `--cont` picks one supply. Without it, the tool uses the open contract.
+- `--json` gives raw JSON.
+
+The output has these keys:
 
 | key | meaning |
 | --- | ------- |
-| `cups` | the supply identifier |
-| `total_kwh` | total consumption for the range |
-| `periods_kwh` | object with `P1`, `P2`, `P3` totals in kWh |
-| `measured_kwh` | kWh from real measurements |
-| `estimated_kwh` | kWh from estimates |
-| `measured_hours` | count of measured hours |
-| `estimated_hours` | count of estimated hours |
-| `peak_demand_kw` | the maximum demand in the range |
-| `contracted_power_kw` | the contracted power of the supply. Example: `{"P1": 4.0}` |
-| `days` | list of days. Each day has `date`, `kwh`, `periods`, and `kind` |
+| `from`, `to` | the real period used |
+| `group` | the group used |
+| `real_kwh` | total measured consumption |
+| `estimated_kwh` | total estimated consumption |
+| `real_hours`, `estimated_hours` | count of measured and estimated hours |
+| `periods_real_kwh` | measured total by `P1`, `P2`, `P3` |
+| `estimated_days` | the dates or date ranges with estimated data |
+| `groups` | one entry per group with `key`, `real_kwh`, `estimated_kwh`, `real_hours`, `estimated_hours` |
 
-The `kind` of a day is one of `measured`, `estimated`, `mixed`, or `no_data`.
+Each request covers up to 35 days. The tool walks the history in 35-day steps.
 
-The `hourly` list has one row per hour. Each row has `date`, `hour`, `kwh`,
-`period` (`P1`, `P2`, `P3`), `method` (`measured` or `estimated`), and `real`.
+## maxpower
 
-## Full history total
+```bash
+python edistribucion.py maxpower
+```
 
-Use `python edistribucion.py total --real-only` to sum the whole history.
+- `--from` and `--to` are `YYYY-MM`. The default is the last 12 months.
+- `--cont` picks one supply. `--json` gives raw JSON.
 
-- The portal has no data before 2024-01-16.
-- The tool walks the history in 35-day steps. Each response covers up to 35
-  days. A larger range returns a transfer id and no data.
-- The output has `total_kwh`, `periods_kwh` (P1, P2, P3), `real_days`,
-  `real_hours`, `all_kwh`, and `by_year_kwh`.
-- `--real-only` counts measured hours only. Without it, the total includes all
-  methods.
-- Use `--from` and `--to` to limit the period. Use `--cont` to pick one supply.
+The output has these keys:
 
-## Maximum demanded power
+| key | meaning |
+| --- | ------- |
+| `requestedPower` | the contracted power in kW |
+| `maxValue` | the single maximum, with the date and the time |
+| `lstData` | one point per month |
 
-Use `python edistribucion.py maxpower`. By default it covers the last 12 months.
-
-- `requestedPower` is the contracted power.
-- `maxValue` is the single maximum, with the date and the time.
-- `lstData` has one point per month. A point with `valid: false` means no data.
-- A valid point has `value` (the monthly maximum in kW) and `periodData` with
-  the per-period maxima (T1, T2, T3). T1 is P1, T2 is P2, T3 is P3.
-
-Options: `--from YYYY-MM`, `--to YYYY-MM`, `--cont`, `--json`.
+A point with `valid: false` means no data for that month. A valid point has
+`value` (the monthly maximum in kW) and `periodData` with the maxima per period.
+`T1` is `P1`, `T2` is `P2`, and `T3` is `P3`.
 
 ## Rules for your answer
 
+- Report the real and the estimated values separately.
 - Always report the split by P1, P2, P3.
+- Report the dates for the estimated data.
 - Report the contracted power and the peak demand.
-- Always say if the values are measured or estimated. If a day is estimated, say
-  so.
-- Report the date range that the tool used. The available range can be smaller
-  than the range you asked for.
 - Do not print the session cookie or the file `session.json`.
 - This tool reads data only. Do not try to change data on the portal.
 
-## Examples
-
-Month consumption:
-
-```bash
-python edistribucion.py month --month 2026-09
-```
-
-Month consumption as JSON:
-
-```bash
-python edistribucion.py month --month 2026-09 --json
-```
-
-A date range on one supply:
-
-```bash
-python edistribucion.py range --from 2026-09-01 --to 2026-09-15 --cont a0ucj00000PYiwHAAT
-```
-
-## Errors you can see
+## Errors
 
 | message | what to do |
 | ------- | ---------- |
 | `Could not obtain aura.token (expired session?)` | the session expired. Tell the user to run `login-backend`. |
 | `Aura error ...` | the portal returned an error. Show the message. |
-| `No sid found in the text.` | the pasted text had no session. Ask for the `Cookie` header again. |
+| `No sid found in the text.` | the text had no session. Ask for the value again. |
 
 ## Files
 

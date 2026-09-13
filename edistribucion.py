@@ -15,15 +15,12 @@ How it works (Salesforce Experience Cloud / Aura):
 
 Session: session.json (or the EDIST_SID environment variable). Commands:
   python edistribucion.py login-backend [--save] # log in with user and password
-  python edistribucion.py import-cookies FILE    # import a cookies.txt
+  python edistribucion.py import-cookies [FILE]  # import a cookies.txt
   python edistribucion.py save --sid "<value>"   # save a value by hand
-  python edistribucion.py status
-  python edistribucion.py cups
-  python edistribucion.py periods [--cont <contId>]
-  python edistribucion.py month --month 2026-09 [--cont <contId>] [--json]
-  python edistribucion.py range --from 2026-09-01 --to 2026-09-30 [--cont <contId>] [--json]
-  python edistribucion.py total [--from 2024-01-16] [--to 2026-09-12] [--real-only] [--json]
-  python edistribucion.py maxpower [--from 2025-08] [--to 2026-08] [--cont <contId>] [--json]
+  python edistribucion.py cups                   # list supplies
+  python edistribucion.py consume [--from YYYY-MM-DD] [--to YYYY-MM-DD]
+                                  [--group hour|day|month|year] [--cont <id>] [--json]
+  python edistribucion.py maxpower [--from YYYY-MM] [--to YYYY-MM] [--cont <id>] [--json]
 """
 import argparse
 import base64
@@ -378,13 +375,6 @@ class Client:
 
 
 # ---------------------------------------------------------------- parsing
-def _date_sort_key(value):
-    try:
-        return datetime.strptime(value, "%d/%m/%Y")
-    except Exception:
-        return datetime.max
-
-
 def parse_curve(data):
     """Normalize returnValue.data from getChartPointsByRange into a flat list."""
     rows = []
@@ -407,55 +397,6 @@ def parse_curve(data):
             "valid": bool(item.get("valid")),
         })
     return rows
-
-
-def summarize(data):
-    """Totals per day, per tariff period (P1/P2/P3) and measured vs estimated."""
-    rows = parse_curve(data)
-    periods = {}
-    days = {}
-    total = measured_kwh = estimated_kwh = 0.0
-    for row in rows:
-        kwh = row["kwh"] or 0.0
-        total += kwh
-        if row["period"]:
-            periods[row["period"]] = round(periods.get(row["period"], 0.0) + kwh, 3)
-        day = days.setdefault(row["date"], {"date": row["date"], "kwh": 0.0, "periods": {},
-                                            "measured_hours": 0, "estimated_hours": 0})
-        day["kwh"] = round(day["kwh"] + kwh, 3)
-        if row["period"]:
-            day["periods"][row["period"]] = round(day["periods"].get(row["period"], 0.0) + kwh, 3)
-        if row["method"] == "measured":
-            day["measured_hours"] += 1
-            measured_kwh += kwh
-        elif row["method"] == "estimated":
-            day["estimated_hours"] += 1
-            estimated_kwh += kwh
-
-    day_list = [days[key] for key in sorted(days, key=_date_sort_key)]
-    for day in day_list:
-        if day["estimated_hours"] and day["measured_hours"]:
-            day["kind"] = "mixed"
-        elif day["estimated_hours"]:
-            day["kind"] = "estimated"
-        elif day["measured_hours"]:
-            day["kind"] = "measured"
-        else:
-            day["kind"] = "no_data"
-
-    return {
-        "cups": data.get("cupsName"),
-        "total_kwh": round(total, 3),
-        "total_api_kwh": float((data.get("totalValue") or "0").replace(",", ".")),
-        "peak_demand_kw": data.get("maxPerMonth"),
-        "periods_kwh": periods,
-        "measured_kwh": round(measured_kwh, 3),
-        "estimated_kwh": round(estimated_kwh, 3),
-        "measured_hours": sum(day["measured_hours"] for day in day_list),
-        "estimated_hours": sum(day["estimated_hours"] for day in day_list),
-        "days": day_list,
-        "hourly": rows,
-    }
 
 
 def parse_cookies_file(path, domain=None):
@@ -524,10 +465,6 @@ def find_cookies_file():
 
 
 # ---------------------------------------------------------------- CLI helpers
-KIND_LABELS = {"measured": "MEASURED", "estimated": "ESTIMATED",
-               "mixed": "MIXED", "no_data": "NO DATA"}
-
-
 def build_client(args):
     return Client(Session(sid=getattr(args, "sid", None), path=args.session))
 
@@ -574,30 +511,6 @@ def default_contract(account, supplies, contract):
         if not item.get("end"):
             return item["contract_id"]
     return supplies[0]["contract_id"]
-
-
-def contracted_power(supplies, contract):
-    for item in supplies:
-        if item["contract_id"] == contract:
-            return item.get("contracted_power_kw")
-    return None
-
-
-def print_summary(summary, date_from, date_to, contract, as_json):
-    if as_json:
-        print(json.dumps(summary, ensure_ascii=False, indent=2))
-        return
-    print("CUPS:", summary["cups"], "| contractId:", contract)
-    print("Range:", date_from, "->", date_to)
-    print("Contracted power:", summary.get("contracted_power_kw") or "-", "kW")
-    print("Total:", summary["total_kwh"], "kWh | peak demand:", summary["peak_demand_kw"], "kW")
-    print("Periods (kWh):", summary["periods_kwh"])
-    print("Measured:", summary["measured_kwh"], "kWh (%d h)" % summary["measured_hours"],
-          "| Estimated:", summary["estimated_kwh"], "kWh (%d h)" % summary["estimated_hours"])
-    print("\nDaily detail:")
-    for day in summary["days"]:
-        print("  %s  %8.3f kWh  %-9s %s" %
-              (day["date"], day["kwh"], KIND_LABELS[day["kind"]], day["periods"]))
 
 
 # ---------------------------------------------------------------- commands
@@ -699,72 +612,46 @@ def cmd_login_backend(args):
         sys.exit(1)
 
 
-def cmd_status(args):
-    client, account, supplies = load_context(args)
-    print(json.dumps({"name": account["name"], "supplies": len(supplies),
-                      "cups": [{"contract_id": item["contract_id"], "cups": item["cups"],
-                                "contracted_power_kw": item["contracted_power_kw"],
-                                "start": item["start"], "end": item["end"]}
-                               for item in supplies]}, ensure_ascii=False, indent=2))
-
-
 def cmd_cups(args):
     _, _, supplies = load_context(args)
     print(json.dumps(supplies, ensure_ascii=False, indent=2))
 
 
-def cmd_periods(args):
-    client, account, supplies = load_context(args)
-    contract = default_contract(account, supplies, args.cont)
-    info = client.get_info(contract, account["visibility_id"])
-    print("CUPS:", info.get("cups"), "| available:", info.get("minDate"), "->", info.get("maxDate"))
-    print("\nBilling periods / contracts:")
-    for item in supplies:
-        if not args.cont or item["contract_id"] == contract:
-            print("  %-14s %s -> %s  tariff=%s  power=%s" %
-                  (item["contract_id"], item["start"], item["end"] or "(open)",
-                   item["tariff"], item["contracted_power_kw"]))
-
-
-def _month_bounds(month):
-    year, mon = int(month[:4]), int(month[5:7])
-    first = date(year, mon, 1)
-    last = date(year + (mon // 12), (mon % 12) + 1, 1) - timedelta(days=1)
-    return first, last
-
-
-def cmd_month(args):
-    client, account, supplies = load_context(args)
-    contract = default_contract(account, supplies, args.cont)
-    first, last = _month_bounds(args.month)
-    date_to = min(last, date.today())
-    info = client.get_info(contract, account["visibility_id"])
-    date_from = first.isoformat()
-    if info.get("minDate") and date_from < info["minDate"]:
-        date_from = info["minDate"]
-    if info.get("maxDate") and date_to.isoformat() > info["maxDate"]:
-        date_to = datetime.strptime(info["maxDate"], "%Y-%m-%d").date()
-    data = client.get_curve(contract, date_from, date_to.isoformat(), account["visibility_id"])
-    summary = summarize(data)
-    summary["contracted_power_kw"] = contracted_power(supplies, contract)
-    if not args.json:
-        print("Month %s (available %s -> %s)" % (args.month, date_from, date_to.isoformat()))
-    print_summary(summary, date_from, date_to.isoformat(), contract, args.json)
-
-
-def cmd_range(args):
-    client, account, supplies = load_context(args)
-    contract = default_contract(account, supplies, args.cont)
-    data = client.get_curve(contract, args.date_from, args.date_to, account["visibility_id"])
-    summary = summarize(data)
-    summary["contracted_power_kw"] = contracted_power(supplies, contract)
-    print_summary(summary, args.date_from, args.date_to, contract, args.json)
-
-
 CHUNK_DAYS = 35
 
 
-def cmd_total(args):
+def _group_key(group, day, hour):
+    if group == "hour":
+        return "%02d" % int(hour[:2])
+    if group == "day":
+        return day.isoformat()
+    if group == "month":
+        return "%04d-%02d" % (day.year, day.month)
+    return "%04d" % day.year
+
+
+def _compress_dates(days):
+    """Turn a sorted list of dates into short ranges."""
+    days = sorted(days)
+    parts = []
+    start = prev = None
+    for day in days:
+        if start is None:
+            start = prev = day
+        elif (day - prev).days == 1:
+            prev = day
+        else:
+            parts.append((start, prev))
+            start = prev = day
+    if start is not None:
+        parts.append((start, prev))
+    out = []
+    for first, last in parts:
+        out.append(first.isoformat() if first == last else "%s..%s" % (first, last))
+    return out
+
+
+def cmd_consume(args):
     client, account, supplies = load_context(args)
     contracts = supplies
     if args.cont:
@@ -787,12 +674,11 @@ def cmd_total(args):
             ranges.append((item["contract_id"], dmin, dmax))
 
     seen = set()
-    total_all = total_real = 0.0
-    periods_all = {"P1": 0.0, "P2": 0.0, "P3": 0.0}
+    buckets = {}
     periods_real = {"P1": 0.0, "P2": 0.0, "P3": 0.0}
-    days = set()
-    hours_real = 0
-    by_year = {}
+    total_real = total_estimated = 0.0
+    real_hours = estimated_hours = 0
+    estimated_days = set()
     first = last = None
 
     for cid, dmin, dmax in ranges:
@@ -808,48 +694,67 @@ def cmd_total(args):
                     continue
                 seen.add(key)
                 kwh = row["kwh"] or 0.0
-                total_all += kwh
-                if row["period"] in periods_all:
-                    periods_all[row["period"]] += kwh
-                if row["method"] != "measured":
-                    continue
-                total_real += kwh
-                if row["period"] in periods_real:
-                    periods_real[row["period"]] += kwh
-                hours_real += 1
                 day = datetime.strptime(row["date"], "%d/%m/%Y").date()
-                days.add(day)
-                by_year[day.year] = by_year.get(day.year, 0.0) + kwh
+                bucket = buckets.setdefault(_group_key(args.group, day, row["hour"]),
+                                            {"real_kwh": 0.0, "estimated_kwh": 0.0,
+                                             "real_hours": 0, "estimated_hours": 0})
+                if row["method"] == "measured":
+                    bucket["real_kwh"] += kwh
+                    bucket["real_hours"] += 1
+                    total_real += kwh
+                    real_hours += 1
+                    if row["period"] in periods_real:
+                        periods_real[row["period"]] += kwh
+                else:
+                    bucket["estimated_kwh"] += kwh
+                    bucket["estimated_hours"] += 1
+                    total_estimated += kwh
+                    estimated_hours += 1
+                    estimated_days.add(day)
                 if first is None or day < first:
                     first = day
                 if last is None or day > last:
                     last = day
             cur = chunk_end + timedelta(days=1)
 
-    main_total = total_real if args.real_only else total_all
-    main_periods = periods_real if args.real_only else periods_all
+    groups = []
+    for key in sorted(buckets):
+        value = buckets[key]
+        groups.append({
+            "key": key,
+            "real_kwh": round(value["real_kwh"], 3),
+            "estimated_kwh": round(value["estimated_kwh"], 3),
+            "real_hours": value["real_hours"],
+            "estimated_hours": value["estimated_hours"],
+        })
     result = {
         "from": first.isoformat() if first else None,
         "to": last.isoformat() if last else None,
-        "real_only": bool(args.real_only),
-        "total_kwh": round(main_total, 3),
+        "group": args.group,
         "real_kwh": round(total_real, 3),
-        "all_kwh": round(total_all, 3),
-        "periods_kwh": {k: round(v, 3) for k, v in main_periods.items()},
-        "real_days": len(days),
-        "real_hours": hours_real,
-        "by_year_kwh": {str(y): round(v, 3) for y, v in sorted(by_year.items())},
+        "estimated_kwh": round(total_estimated, 3),
+        "real_hours": real_hours,
+        "estimated_hours": estimated_hours,
+        "periods_real_kwh": {k: round(v, 3) for k, v in periods_real.items()},
+        "estimated_days": _compress_dates(estimated_days),
+        "groups": groups,
     }
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return
-    print("Period:", result["from"], "->", result["to"])
-    print("Total:", result["total_kwh"], "kWh | real days:", result["real_days"],
-          "| real hours:", result["real_hours"])
-    print("P1:", result["periods_kwh"].get("P1"), "| P2:", result["periods_kwh"].get("P2"),
-          "| P3:", result["periods_kwh"].get("P3"))
-    print("All methods:", result["all_kwh"], "kWh | real:", result["real_kwh"], "kWh")
-    print("By year:", result["by_year_kwh"])
+
+    print("Period:", result["from"], "->", result["to"], "| group:", args.group)
+    print("Real:", result["real_kwh"], "kWh (%d h)" % real_hours,
+          "| Estimated:", result["estimated_kwh"], "kWh (%d h)" % estimated_hours)
+    print("Real periods:", result["periods_real_kwh"])
+    if result["estimated_days"]:
+        print("Estimated dates:", ", ".join(result["estimated_days"]))
+    else:
+        print("Estimated dates: none")
+    print("By %s (real kWh | estimated kWh):" % args.group)
+    for group in groups:
+        print("  %-12s %10.3f | %10.3f" % (
+            group["key"], group["real_kwh"], group["estimated_kwh"]))
 
 
 def cmd_maxpower(args):
@@ -924,37 +829,17 @@ def build_parser():
                          help="path to the credentials file")
     backend.set_defaults(func=cmd_login_backend)
 
-    sub.add_parser("status", parents=[common],
-                   help="account and supplies").set_defaults(func=cmd_status)
     sub.add_parser("cups", parents=[common], help="list supplies").set_defaults(func=cmd_cups)
 
-    periods = sub.add_parser("periods", parents=[common], help="billing periods / contracts")
-    periods.add_argument("--cont")
-    periods.set_defaults(func=cmd_periods)
-
-    month = sub.add_parser("month", parents=[common],
-                           help="consumption for a full month (P1/P2/P3, measured/estimated)")
-    month.add_argument("--month", required=True, help="YYYY-MM, e.g. 2026-09")
-    month.add_argument("--cont")
-    month.add_argument("--json", action="store_true")
-    month.set_defaults(func=cmd_month)
-
-    rng = sub.add_parser("range", parents=[common], help="consumption for a date range")
-    rng.add_argument("--from", dest="date_from", required=True, help="YYYY-MM-DD")
-    rng.add_argument("--to", dest="date_to", required=True, help="YYYY-MM-DD")
-    rng.add_argument("--cont")
-    rng.add_argument("--json", action="store_true")
-    rng.set_defaults(func=cmd_range)
-
-    total = sub.add_parser("total", parents=[common],
-                           help="aggregate consumption over the full history")
-    total.add_argument("--from", dest="date_from", help="YYYY-MM-DD")
-    total.add_argument("--to", dest="date_to", help="YYYY-MM-DD")
-    total.add_argument("--cont")
-    total.add_argument("--real-only", action="store_true",
-                       help="count measured hours only")
-    total.add_argument("--json", action="store_true")
-    total.set_defaults(func=cmd_total)
+    consume = sub.add_parser("consume", parents=[common],
+                             help="aggregate consumption by hour, day, month or year")
+    consume.add_argument("--from", dest="date_from", help="YYYY-MM-DD")
+    consume.add_argument("--to", dest="date_to", help="YYYY-MM-DD")
+    consume.add_argument("--group", choices=["hour", "day", "month", "year"],
+                         default="day", help="group by hour of day, day, month or year")
+    consume.add_argument("--cont")
+    consume.add_argument("--json", action="store_true")
+    consume.set_defaults(func=cmd_consume)
 
     mp = sub.add_parser("maxpower", parents=[common],
                         help="maximum demanded power per month")
