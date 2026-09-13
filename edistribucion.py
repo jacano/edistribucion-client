@@ -932,13 +932,20 @@ def _print_report(result):
         print("    %s  %10.3f | %10.3f" % (
             group["key"], group["real_kwh"], group["estimated_kwh"]))
     print()
-    print("MAX HOURLY CONSUMPTION")
-    for year, value in result["max_hourly_by_year"].items():
-        print("  %s  %.3f kWh  (%s %s)" % (year, value["kwh"], value["date"], value["hour"]))
-    print()
-    print("MAX DEMANDED POWER (monthly, from the portal)")
-    for year, value in result["max_demand_by_year"].items():
-        print("  %s  %.3f kW  (%s)" % (year, value["kw"], value["date"]))
+    print("MAXIMUM PER YEAR")
+    print("  %-4s  %10s  %-20s  %11s  %s"
+          % ("Year", "Peak hour", "When", "Peak demand", "When"))
+    hourly = result["max_hourly_by_year"]
+    demand = result["max_demand_by_year"]
+    for year in sorted(set(hourly) | set(demand)):
+        peak = hourly.get(year)
+        power = demand.get(year)
+        peak_kwh = "%.3f kWh" % peak["kwh"] if peak else "-"
+        peak_when = "%s %s" % (peak["date"], peak["hour"]) if peak else "-"
+        power_kw = "%.3f kW" % power["kw"] if power else "-"
+        power_when = power["date"].replace("-", "/") if power else "-"
+        print("  %-4s  %10s  %-20s  %11s  %s"
+              % (year, peak_kwh, peak_when, power_kw, power_when))
     print()
     if result["has_estimated"]:
         print("WARNING: there are estimated consumptions.")
