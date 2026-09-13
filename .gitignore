@@ -1,0 +1,10 @@
+# Session cookies (secret)
+sesion.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
