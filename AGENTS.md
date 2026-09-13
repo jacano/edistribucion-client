@@ -52,7 +52,7 @@ for each CUPS of the account, one after another. It contains:
 
 - the CUPS id and the contracted power per period,
 - the real period used,
-- the real consumption total and the split by `P1`, `P2`, `P3`,
+- the real and estimated totals and the split by `P1`, `P2`, `P3`,
 - the consumption by year (with the P1, P2, P3 split), month, and hour, with
   real and estimated values,
 - the maximum consumption in one hour per year,

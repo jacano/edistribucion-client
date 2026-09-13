@@ -157,12 +157,6 @@ class Session:
         return "; ".join("%s=%s" % (k, v) for k, v in self.cookies.items())
 
 
-def aura_context():
-    return json.dumps({"mode": "PROD", "fwuid": FWUID, "app": "siteforce:communityApp",
-                       "loaded": {"APPLICATION@markup://siteforce:communityApp": APP_VERSION},
-                       "dn": [], "globals": {}, "uad": True}, separators=(",", ":"))
-
-
 # ---------------------------------------------------------------- credentials
 class _DataBlob(ctypes.Structure):
     _fields_ = [("cbData", wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_char))]
@@ -791,6 +785,7 @@ def collect_consumption(client, account, contracts):
     """Read the full history from the zip and return the aggregates."""
     groups = {"year": {}, "month": {}, "hour": {}}
     periods_real = {"P1": 0.0, "P2": 0.0, "P3": 0.0}
+    periods_estimated = {"P1": 0.0, "P2": 0.0, "P3": 0.0}
     periods_year = {}
     total_real = total_estimated = 0.0
     real_hours = estimated_hours = 0
@@ -829,12 +824,13 @@ def collect_consumption(client, account, contracts):
         year_slot = periods_year.setdefault(day.year, {name: {"real": 0.0, "estimated": 0.0}
                                                        for name in ("P1", "P2", "P3")})
         year_slot[period]["real" if real else "estimated"] += kwh
+        target = periods_real if real else periods_estimated
+        if period in target:
+            target[period] += kwh
         label = "%02d - %02d h" % (hour, hour + 1)
         if real:
             total_real += kwh
             real_hours += 1
-            if period in periods_real:
-                periods_real[period] += kwh
             if day.year not in year_peak or kwh > year_peak[day.year][0]:
                 year_peak[day.year] = (kwh, day.strftime("%d/%m/%Y"), label)
             month_key = "%04d-%02d" % (day.year, day.month)
@@ -852,6 +848,7 @@ def collect_consumption(client, account, contracts):
     return {
         "groups": groups,
         "periods_real_kwh": periods_real,
+        "periods_estimated_kwh": periods_estimated,
         "periods_year": periods_year,
         "real_kwh": total_real,
         "estimated_kwh": total_estimated,
@@ -891,9 +888,12 @@ def _print_report(result):
     print("Contracted power:", result["contracted_power_kw"], "kW")
     print("Period:", result["from"], "->", result["to"])
     print()
-    print("REAL CONSUMPTION")
-    print("  Total:", result["real_kwh"], "kWh in", result["real_hours"], "hours")
-    print("  Periods:", result["periods_real_kwh"])
+    print("CONSUMPTION")
+    print("  Total real:", result["real_kwh"], "kWh in", result["real_hours"], "hours")
+    print("  Total estimated:", result["estimated_kwh"], "kWh in",
+          result["estimated_hours"], "hours")
+    print("  Periods real:", result["periods_real_kwh"])
+    print("  Periods estimated:", result["periods_estimated_kwh"])
     print("  By year (real | estimated kWh, real | estimated hours):")
     for group in result["consumption_by_year"]:
         print("    %s  %10.3f | %10.3f  | %6d h | %6d h" % (
@@ -963,6 +963,8 @@ def cmd_report(args):
             "real_hours": data["real_hours"],
             "estimated_hours": data["estimated_hours"],
             "periods_real_kwh": {k: round(v, 3) for k, v in data["periods_real_kwh"].items()},
+            "periods_estimated_kwh": {k: round(v, 3)
+                                      for k, v in data["periods_estimated_kwh"].items()},
             "periods_by_year": {str(year): {name: {"real": round(slot["real"], 3),
                                                    "estimated": round(slot["estimated"], 3)}
                                             for name, slot in sorted(periods.items())}

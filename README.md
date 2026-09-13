@@ -8,7 +8,7 @@ It gives one thing: a **full report**. The report uses all the data available
 and covers every CUPS of the account, one after another. Each report contains:
 
 - the contracted power per period (P1, P2),
-- the real consumption total and the split by P1, P2, P3,
+- the real and estimated consumption totals and the split by P1, P2, P3,
 - the real and estimated consumption by year (with the P1, P2, P3 split),
   month, and hour,
 - the maximum consumption in one hour per year,
@@ -92,9 +92,11 @@ CUPS: ES0031102226226018WR0F | cups_id: a0r2400000GIpw1AAD
 Contracted power: {'P1': 4.0, 'P2': 4.0} kW
 Period: 2024-01-16 -> 2026-09-14
 
-REAL CONSUMPTION
-  Total: 5797.068 kWh in 15911 hours
-  Periods: {'P1': 1890.9, 'P2': 1704.064, 'P3': 2202.104}
+CONSUMPTION
+  Total real: 5797.068 kWh in 15911 hours
+  Total estimated: 2742.983 kWh in 7438 hours
+  Periods real: {'P1': 1890.9, 'P2': 1704.064, 'P3': 2202.104}
+  Periods estimated: {'P1': 810.04, 'P2': 657.056, 'P3': 1275.887}
   By year (real | estimated kWh, real | estimated hours):
     2024    2007.797 |    595.522  |   6265 h |   2158 h
       P1   606.608 |  165.083

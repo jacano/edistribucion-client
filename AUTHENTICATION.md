@@ -3,6 +3,14 @@
 The session is the `sid` cookie. The tool needs that value. There are three
 ways to give it. All of them write the file `session.json`.
 
+The examples use `python edistribucion.py`. The installed tool is the same.
+Write `edistribucion` in place of `python edistribucion.py`.
+
+The tool writes `session.json` and `credentials.json` in the folder of the
+file, or in the current folder. If neither has the files, it uses the user
+config folder (`%APPDATA%\edistribucion` on Windows, `~/.config/edistribucion`
+on Linux and macOS).
+
 ## `login-backend` (recommended)
 
 This command logs in with the portal login call. No browser.
