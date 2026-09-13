@@ -40,6 +40,27 @@ python edistribucion.py save --sid "<sid cookie value>"
 
 You can also put the value in the environment variable `EDIST_SID`.
 
+## Easier way to get the sid
+
+You can use the browser extension "Get cookies.txt LOCALLY" to export the
+cookies. Link:
+
+https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc
+
+Steps:
+
+1. Log in to the portal.
+2. Open the extension on the portal page.
+3. Export the cookies for this site. Save the file.
+4. Import the file:
+
+```bash
+python edistribucion.py import-cookies cookies.txt
+```
+
+The command reads the `sid` cookie and saves it to `sesion.json`. The command
+also accepts a JSON export.
+
 ## Commands
 
 ```bash

@@ -290,6 +290,34 @@ def summarize(data):
     }
 
 
+def parse_cookies_file(path):
+    """Read a cookies file. Accepts Netscape cookies.txt or a JSON export.
+
+    The browser extension 'Get cookies.txt LOCALLY' writes the Netscape format.
+    Return a dict of name -> value.
+    """
+    text = open(path, encoding="utf-8", errors="replace").read()
+    cookies = {}
+    stripped = text.lstrip()
+    if stripped.startswith("[") or stripped.startswith("{"):
+        data = json.loads(text)
+        if isinstance(data, dict):
+            data = data.get("cookies", data)
+        for item in data:
+            name = item.get("name")
+            if name:
+                cookies[name] = item.get("value")
+    else:
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("\t")
+            if len(parts) >= 7:
+                cookies[parts[5]] = parts[6]
+    return cookies
+
+
 # ---------------------------------------------------------------- CLI helpers
 KIND_LABELS = {"measured": "MEASURED", "estimated": "ESTIMATED",
                "mixed": "MIXED", "no_data": "NO DATA"}
@@ -343,6 +371,15 @@ def cmd_save(args):
     session.save()
     print("Session saved to", args.session)
     print("cookies:", ", ".join(session.cookies.keys()))
+
+
+def cmd_import_cookies(args):
+    cookies = parse_cookies_file(args.file)
+    session = Session(path=args.session)
+    session.cookies.update(cookies)
+    session.save()
+    print("Imported %d cookies into %s" % (len(cookies), args.session))
+    print("sid found:", "yes" if session.cookies.get("sid") else "no")
 
 
 def cmd_status(args):
@@ -423,6 +460,11 @@ def build_parser():
     save = sub.add_parser("save", help="store session cookies")
     save.add_argument("--cookie", help="extra cookies: 'k=v; k2=v2'")
     save.set_defaults(func=cmd_save)
+
+    imp = sub.add_parser("import-cookies",
+                         help="import cookies from a cookies.txt (Netscape) or JSON file")
+    imp.add_argument("file", help="path to cookies.txt or JSON export")
+    imp.set_defaults(func=cmd_import_cookies)
 
     sub.add_parser("status", help="account and supplies").set_defaults(func=cmd_status)
     sub.add_parser("cups", help="list supplies").set_defaults(func=cmd_cups)
