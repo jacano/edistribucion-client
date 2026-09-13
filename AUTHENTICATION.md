@@ -183,6 +183,29 @@ completes the login with a redirect chain:
 
 The tool follows this chain for you.
 
+## Option 5: Chrome window login
+
+This option opens a Chrome window. You log in on the official site. The tool
+reads the session cookie with the DevTools Protocol. That protocol sees HttpOnly
+cookies, so no code injection is needed.
+
+```bash
+python edistribucion.py login-chrome
+```
+
+1. Chrome opens with its own profile. It does not touch your main profile.
+2. Log in to the portal in that window.
+3. The tool reads the `sid` cookie, writes `sesion.json`, and closes Chrome.
+
+Options:
+
+- `--keep-open` leaves Chrome open.
+- `--profile-dir PATH` changes the profile folder.
+- `--port PORT` changes the debug port.
+- `--timeout SECONDS` changes the wait time.
+
+The profile stays on disk. On the next run, Chrome may still hold the session.
+
 ## Direct options
 
 You can also skip the menu.

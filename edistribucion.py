@@ -732,6 +732,26 @@ def cmd_login_backend(args):
         sys.exit(1)
 
 
+def cmd_login_chrome(args):
+    from chrome_login import capture_sid
+    print("Opening Chrome. Log in to the portal in that window.")
+    print("The tool captures the session when the login is done.")
+    sid = capture_sid(BASE + LOGIN_PAGE, profile_dir=args.profile_dir,
+                      port=args.port, timeout=args.timeout, keep_open=args.keep_open)
+    if not sid:
+        print("No session captured.", file=sys.stderr)
+        sys.exit(1)
+    session = Session(sid=sid, path=args.session)
+    session.save()
+    print("Session saved to", args.session)
+    try:
+        account = Client(session).whoami()
+        print("Login OK. User:", account["name"])
+    except Exception as exc:
+        print("Session saved, but the check failed:", exc, file=sys.stderr)
+        sys.exit(1)
+
+
 def cmd_status(args):
     client, account, supplies = load_context(args)
     print(json.dumps({"name": account["name"], "supplies": len(supplies),
@@ -826,6 +846,14 @@ def build_parser():
     backend.add_argument("--credentials", default=DEFAULT_CREDENTIALS,
                          help="path to the credentials file")
     backend.set_defaults(func=cmd_login_backend)
+
+    chrome_login = sub.add_parser("login-chrome", parents=[common],
+                                  help="open Chrome and capture the session after you log in")
+    chrome_login.add_argument("--profile-dir", help="Chrome user data dir for the tool")
+    chrome_login.add_argument("--port", type=int, default=9333)
+    chrome_login.add_argument("--timeout", type=int, default=300)
+    chrome_login.add_argument("--keep-open", action="store_true", help="leave Chrome open")
+    chrome_login.set_defaults(func=cmd_login_chrome)
 
     sub.add_parser("status", parents=[common],
                    help="account and supplies").set_defaults(func=cmd_status)

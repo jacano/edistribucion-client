@@ -39,6 +39,9 @@ portal, follows the login chain, and saves the session. It can store the
 credentials encrypted with the Windows DPAPI. When the session expires, the tool
 logs in again with the stored credentials.
 
+There is also a Chrome window login. The tool opens Chrome with its own profile,
+you log in, and the tool reads the session cookie with the DevTools Protocol.
+
 An agent with the Chrome DevTools MCP can also read the `Cookie` header of a
 portal request and save the session. You can also pass the session directly with
 `--sid`.
