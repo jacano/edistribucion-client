@@ -12,6 +12,10 @@ How it works (Salesforce Experience Cloud / Aura):
     refreshing automatically when needed.
   - Actions are invoked with POST to `/s/sfsites/aura` using
     message / aura.context / aura.pageURI / aura.token.
+  - The full hourly history comes as one zip from `WP_Measure_v3_CTRL.createZip`
+    (the "massive download" page). This needs far fewer calls than one call per
+    month of data. The period (P1 / P2 / P3) is worked out from the date and the
+    hour with the 2.0TD calendar.
 
 Session: session.json (or the EDIST_SID environment variable). Commands:
   python edistribucion.py login-backend [--save] # log in with user and password
@@ -21,18 +25,22 @@ Session: session.json (or the EDIST_SID environment variable). Commands:
 """
 import argparse
 import base64
+import csv
 import ctypes
 import getpass
 import http.cookiejar
+import io
 import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 from ctypes import wintypes
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 BASE = "https://zonaprivada.edistribucion.com"
 SITE = BASE + "/areaprivada"
@@ -41,6 +49,7 @@ HOME_PAGE = "/areaprivada/s/"
 LOGIN_PAGE = "/areaprivada/s/login/"
 MEASURELIST_PAGE = "/areaprivada/s/wp-measurelist-v4"
 DETAIL_PAGE = "/areaprivada/s/wp-measure-detail-v4"
+DOWNLOAD_PAGE = "/areaprivada/s/wp-massivemeasuredownload-v3"
 MAXPOWER_PAGE = "/areaprivada/s/wp-maximeterhistogramdetail"
 ATR_PAGE = "/areaprivada/s/wp-atrcontractdetail"
 
@@ -66,9 +75,15 @@ ACTIONS = {
     "get_info": ("WP_Measure_v3_CTRL.getInfo",
                  "apex://WP_Measure_v3_CTRL/ACTION$getInfo",
                  "markup://c:WP_Measure_Detail_v4"),
-    "curve": ("WP_Measure_v3_CTRL.getChartPointsByRange",
-              "apex://WP_Measure_v3_CTRL/ACTION$getChartPointsByRange",
-              "markup://c:WP_Measure_Detail_Filter_By_Dates_v3"),
+    "measure_list": ("WP_Measure_v3_CTRL.getListCups",
+                     "apex://WP_Measure_v3_CTRL/ACTION$getListCups",
+                     "markup://c:WP_Massive_Measure_Download_v3"),
+    "create_zip": ("WP_Measure_v3_CTRL.createZip",
+                   "apex://WP_Measure_v3_CTRL/ACTION$createZip",
+                   "markup://c:WP_Massive_Measure_Filter2_v3"),
+    "get_files": ("WP_Download_Transfer_CTRL.getFiles",
+                  "apex://WP_Download_Transfer_CTRL/ACTION$getFiles",
+                  "markup://c:WP_Download_Transfer_Table"),
     "maximeter": ("WP_MaximeterHistogram_CTRL.getHistogramPoints",
                   "apex://WP_MaximeterHistogram_CTRL/ACTION$getHistogramPoints",
                   "markup://c:WP_MaximeterHistogramDetail"),
@@ -77,7 +92,10 @@ ACTIONS = {
                    "markup://c:WP_SuppliesATRDetailForm"),
 }
 
-METHODS = {"R": "measured", "E": "estimated", "C": "calculated"}
+# National holidays with a fixed date. All their hours are off-peak (P3).
+# The portal uses the same set, so the dates with no fixed date (Easter) are not
+# off-peak.
+FIXED_HOLIDAYS = {(1, 1), (1, 6), (5, 1), (8, 15), (10, 12), (11, 1), (12, 6), (12, 8), (12, 25)}
 
 
 # ---------------------------------------------------------------- session/HTTP
@@ -361,12 +379,27 @@ class Client:
         page = "%s?aId=%s&vis=%s" % (DETAIL_PAGE, contract_id, visibility_id)
         return self.call("get_info", {"contId": contract_id, "visId": visibility_id}, page).get("data", {})
 
-    def get_curve(self, contract_id, date_from, date_to, visibility_id=None):
-        page = DETAIL_PAGE
-        if visibility_id:
-            page = "%s?aId=%s&vis=%s" % (DETAIL_PAGE, contract_id, visibility_id)
-        params = {"contId": contract_id, "type": "4", "startDate": date_from, "endDate": date_to}
-        return self.call("curve", params, page).get("data", {})
+    def list_measure_cups(self, visibility_id):
+        return self.call("measure_list", {"sIdentificador": visibility_id}, DOWNLOAD_PAGE)
+
+    def create_zip(self, visibility_id, contract_ids, contracts, start_date, end_date):
+        params = {"roleId": visibility_id, "lstCupsIds": contract_ids, "data": contracts,
+                  "startDate": start_date, "endDate": end_date, "downloadType": 1}
+        return self.call("create_zip", params, DOWNLOAD_PAGE)
+
+    def get_files(self, visibility_id):
+        params = {"roleId": visibility_id, "type": ["01", "50", "51"]}
+        return self.call("get_files", params, DOWNLOAD_PAGE).get("data", {})
+
+    def download_file(self, fileid):
+        """Return the raw bytes of a file that get_files lists."""
+        url = BASE + "/areaprivada/sfc/servlet.shepherd/version/download/" + fileid
+        headers = {"User-Agent": USER_AGENT, "Accept": "*/*"}
+        if self.session.sid:
+            headers["Cookie"] = self.session.cookie_header()
+        request = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(request, timeout=90) as response:
+            return response.read()
 
     def get_maximeter(self, cups_id, visibility_id, start_date, end_date):
         page = "%s?aId=%s&sId=%s" % (MAXPOWER_PAGE, cups_id, visibility_id)
@@ -393,28 +426,65 @@ class Client:
 
 
 # ---------------------------------------------------------------- parsing
-def parse_curve(data):
-    """Normalize returnValue.data from getChartPointsByRange into a flat list."""
-    rows = []
-    flat = []
-    for item in (data.get("lstData") or []):
-        if isinstance(item, list):
-            flat.extend(item)
-        elif isinstance(item, dict):
-            flat.append(item)
-    for item in flat:
-        period = item.get("tariffPeriod")
-        rows.append({
-            "date": item.get("date"),
-            "hour": item.get("hour"),
-            "kwh": item.get("valueDouble"),
-            "period": ("P" + str(period)) if period else None,
-            "real": bool(item.get("real")),
-            "method": METHODS.get(item.get("obtainingMethod"), item.get("obtainingMethod")),
-            "invoiced": bool(item.get("invoiced")),
-            "valid": bool(item.get("valid")),
-        })
-    return rows
+def tariff_period(day, hour):
+    """Return P1, P2 or P3 for a date and a clock hour, on the 2.0TD tariff."""
+    if day.weekday() >= 5 or (day.month, day.day) in FIXED_HOLIDAYS:
+        return "P3"
+    if 10 <= hour < 14 or 18 <= hour < 22:
+        return "P1"
+    if 8 <= hour < 10 or 14 <= hour < 18 or 22 <= hour < 24:
+        return "P2"
+    return "P3"
+
+
+def zip_hours(payload):
+    """Yield (day, hour, kwh, real) from the hourly CSV files in the zip.
+
+    The Hora column counts the hours of the day, so a day of the change of the
+    hour has 23 or 25 rows. The change is always in a Sunday (all P3), so the
+    exact hour does not change the period.
+    """
+    days = {}
+    order = []
+    names = []
+    with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+        for name in archive.namelist():
+            upper = name.upper()
+            if upper.endswith("_HORARIO.CSV") and not upper.endswith("_CCH_CONS.CSV"):
+                names.append(name)
+        for name in sorted(names):
+            with archive.open(name) as raw:
+                text = io.TextIOWrapper(raw, encoding="utf-8-sig", newline="")
+                reader = csv.reader(text, delimiter=";")
+                header = next(reader, None)
+                cols = {value.strip().upper(): index for index, value in enumerate(header or [])}
+                i_date = cols.get("FECHA")
+                i_kwh = cols.get("AE_KWH")
+                i_flag = cols.get("REAL/ESTIMADO")
+                if i_date is None or i_kwh is None or i_flag is None:
+                    continue
+                width = max(i_date, i_kwh, i_flag)
+                for row in reader:
+                    if len(row) <= width:
+                        continue
+                    day = datetime.strptime(row[i_date], "%d/%m/%Y").date()
+                    value = row[i_kwh].replace(",", ".").strip()
+                    kwh = float(value) if value else 0.0
+                    if day not in days:
+                        days[day] = []
+                        order.append(day)
+                    days[day].append((kwh, row[i_flag].strip().upper().startswith("R")))
+    for day in order:
+        rows = days[day]
+        count = len(rows)
+        for index, (kwh, real) in enumerate(rows, start=1):
+            if count == 23 and index >= 3:
+                hour = index
+            elif count == 25 and index >= 4:
+                hour = index - 2
+            else:
+                hour = index - 1
+            yield day, min(hour, 23), kwh, real
 
 
 def parse_cookies_file(path, domain=None):
@@ -621,9 +691,6 @@ def cmd_login_backend(args):
         sys.exit(1)
 
 
-CHUNK_DAYS = 35
-
-
 def _compress_dates(days):
     """Turn a sorted list of dates into short ranges."""
     days = sorted(days)
@@ -645,8 +712,37 @@ def _compress_dates(days):
     return out
 
 
-def collect_consumption(client, account, contracts, date_from, date_to):
-    """Walk the history once. Return the real and estimated aggregates."""
+def _download_measure_zip(client, account, contracts):
+    """Ask the portal for one zip with all the hourly curves of a CUPS.
+
+    The portal makes the zip in the background. This waits until the file
+    appears in the download list, then returns its bytes.
+    """
+    visibility = account["visibility_id"]
+    listing = client.list_measure_cups(visibility).get("data") or {}
+    wanted = {item["contract_id"] for item in contracts}
+    contract_ids = [value for value in (listing.get("lstIds") or []) if value in wanted]
+    records = [row for row in (listing.get("lstCups") or []) if row.get("Id") in wanted]
+    if not contract_ids:
+        return None
+    starts = [item["start"] for item in contracts if item.get("start")]
+    ends = [item.get("end") or date.today().isoformat() for item in contracts]
+    start = datetime.strptime(min(starts), "%Y-%m-%d").strftime("%d/%m/%Y")
+    end = datetime.strptime(max(ends), "%Y-%m-%d").strftime("%d/%m/%Y")
+
+    known = {item.get("fileid") for item in (client.get_files(visibility).get("lstFiles") or [])}
+    client.create_zip(visibility, contract_ids, records, start, end)
+    for _ in range(60):
+        time.sleep(3)
+        files = client.get_files(visibility).get("lstFiles") or []
+        fresh = [item for item in files if item.get("fileid") not in known]
+        if fresh:
+            return client.download_file(fresh[0]["fileid"])
+    raise RuntimeError("The portal did not make the zip in time.")
+
+
+def collect_consumption(client, account, contracts):
+    """Read the full history from the zip and return the aggregates."""
     groups = {"year": {}, "month": {}, "hour": {}}
     periods_real = {"P1": 0.0, "P2": 0.0, "P3": 0.0}
     total_real = total_estimated = 0.0
@@ -655,67 +751,52 @@ def collect_consumption(client, account, contracts, date_from, date_to):
     year_peak = {}
     month_peak = {}
     first = last = None
-    seen = set()
+    hours = {}
 
     def bucket(group, key):
         return groups[group].setdefault(key, {"real_kwh": 0.0, "estimated_kwh": 0.0,
                                               "real_hours": 0, "estimated_hours": 0})
 
-    for item in contracts:
-        info = client.get_info(item["contract_id"], account["visibility_id"])
-        dmin, dmax = info.get("minDate"), info.get("maxDate")
-        if not dmin or not dmax:
-            continue
-        if date_from and date_from > dmin:
-            dmin = date_from
-        if date_to and date_to < dmax:
-            dmax = date_to
-        if dmin > dmax:
-            continue
-        cur = datetime.strptime(dmin, "%Y-%m-%d").date()
-        end = datetime.strptime(dmax, "%Y-%m-%d").date()
-        while cur <= end:
-            chunk_end = min(cur + timedelta(days=CHUNK_DAYS - 1), end)
-            data = client.get_curve(item["contract_id"], cur.isoformat(), chunk_end.isoformat(),
-                                    account["visibility_id"])
-            for row in parse_curve(data):
-                key = (row["date"], row["hour"])
-                if key in seen:
-                    continue
-                seen.add(key)
-                kwh = row["kwh"] or 0.0
-                day = datetime.strptime(row["date"], "%d/%m/%Y").date()
-                hour_key = "%02d" % int(row["hour"][:2])
-                measured = row["method"] == "measured"
-                for group, gkey in (("year", "%04d" % day.year),
-                                    ("month", "%04d-%02d" % (day.year, day.month)),
-                                    ("hour", hour_key)):
-                    entry = bucket(group, gkey)
-                    if measured:
-                        entry["real_kwh"] += kwh
-                        entry["real_hours"] += 1
-                    else:
-                        entry["estimated_kwh"] += kwh
-                        entry["estimated_hours"] += 1
-                if measured:
-                    total_real += kwh
-                    real_hours += 1
-                    if row["period"] in periods_real:
-                        periods_real[row["period"]] += kwh
-                    if day.year not in year_peak or kwh > year_peak[day.year][0]:
-                        year_peak[day.year] = (kwh, row["date"], row["hour"])
-                    month_key = "%04d-%02d" % (day.year, day.month)
-                    if month_key not in month_peak or kwh > month_peak[month_key][0]:
-                        month_peak[month_key] = (kwh, row["date"], row["hour"])
-                else:
-                    total_estimated += kwh
-                    estimated_hours += 1
-                    estimated_days.add(day)
-                if first is None or day < first:
-                    first = day
-                if last is None or day > last:
-                    last = day
-            cur = chunk_end + timedelta(days=1)
+    payload = _download_measure_zip(client, account, contracts)
+    if payload:
+        for day, hour, kwh, real in zip_hours(payload):
+            key = (day, hour)
+            old = hours.get(key)
+            if old is None or (real and not old[1]):
+                hours[key] = (kwh, real)
+
+    for (day, hour), (kwh, real) in sorted(hours.items()):
+        hour_key = "%02d" % hour
+        for group, gkey in (("year", "%04d" % day.year),
+                            ("month", "%04d-%02d" % (day.year, day.month)),
+                            ("hour", hour_key)):
+            entry = bucket(group, gkey)
+            if real:
+                entry["real_kwh"] += kwh
+                entry["real_hours"] += 1
+            else:
+                entry["estimated_kwh"] += kwh
+                entry["estimated_hours"] += 1
+        label = "%02d - %02d h" % (hour, hour + 1)
+        if real:
+            total_real += kwh
+            real_hours += 1
+            period = tariff_period(day, hour)
+            if period in periods_real:
+                periods_real[period] += kwh
+            if day.year not in year_peak or kwh > year_peak[day.year][0]:
+                year_peak[day.year] = (kwh, day.strftime("%d/%m/%Y"), label)
+            month_key = "%04d-%02d" % (day.year, day.month)
+            if month_key not in month_peak or kwh > month_peak[month_key][0]:
+                month_peak[month_key] = (kwh, day.strftime("%d/%m/%Y"), label)
+        else:
+            total_estimated += kwh
+            estimated_hours += 1
+            estimated_days.add(day)
+        if first is None or day < first:
+            first = day
+        if last is None or day > last:
+            last = day
 
     return {
         "groups": groups,
@@ -800,7 +881,7 @@ def cmd_report(args):
     for cups in names:
         group = [item for item in supplies if item["cups"] == cups]
         current = next((item for item in group if not item.get("end")), group[-1])
-        data = collect_consumption(client, account, group, None, None)
+        data = collect_consumption(client, account, group)
         if not data["from"]:
             continue
         contracted = client.get_contracted_power(current["contract_id"], visibility)

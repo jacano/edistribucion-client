@@ -58,8 +58,11 @@ Option:
 
 - `--json` gives raw JSON. With several CUPS, the JSON is a list.
 
-Each request covers up to 35 days. The tool walks all the history in 35-day
-steps. The portal has no data before 2024-01-16.
+The tool asks the portal for one zip with the hourly curves (action
+`createZip`), waits for it, and reads it. The period (P1, P2, P3) comes from the
+2.0TD calendar, not from a data call.
+
+The portal has no data before 2024-01-16.
 
 ## Rules for your answer
 

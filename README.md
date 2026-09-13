@@ -79,8 +79,9 @@ WARNING: there are estimated consumptions.
   Estimated dates: 2024-03-02..2024-04-03, ...
 ```
 
-Each request covers up to 35 days. The tool walks the history in 35-day steps.
-The portal has no data before 2024-01-16.
+The tool asks the portal for one zip with the hourly curves and reads it. This
+is much faster than one call per month. The period (P1, P2, P3) is worked out
+from the 2.0TD calendar. The portal has no data before 2024-01-16.
 
 ## Security
 
