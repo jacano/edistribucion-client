@@ -49,20 +49,59 @@ The tool finds the `sid` value in the cURL line.
 
 ## Option 2: import a cookies file
 
-This option uses a browser extension that exports cookies. One example is
-"Get cookies.txt LOCALLY":
+This option uses a browser extension. The extension can read the cookie store,
+because Chrome trusts it. The tool cannot. So the extension writes the cookies
+to a file, and the tool reads that file.
+
+### Install the extension
+
+One example is "Get cookies.txt LOCALLY":
+
 `https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc`
 
-1. Log in to the portal.
-2. Open the extension on the portal page.
-3. Export the cookies. Save the file. The usual name is `cookies.txt`.
-4. In the tool, type the file path. Press Enter.
+1. Open the link in Chrome.
+2. Click "Add to Chrome".
+3. Click "Add extension" in the dialog.
+4. Pin the extension. Click the puzzle piece icon, then the pin next to the
+   extension name.
 
-You can also import the file directly, without the menu:
+Any extension that exports the Netscape `cookies.txt` format works.
+
+### Export the cookies
+
+Do this after you log in, and only when the session expired.
+
+1. Log in to the portal.
+2. Click the extension icon.
+3. Select the current site or the export option.
+4. Select the Netscape format, if the extension asks.
+5. Click "Export" or "Download". The file goes to your Downloads folder. The
+   usual name is `cookies.txt`.
+
+### Import the cookies
+
+The tool finds the newest cookies file in your Downloads folder. You can also
+type the path.
+
+```bash
+python edistribucion.py import-cookies
+```
+
+Or give the path:
 
 ```bash
 python edistribucion.py import-cookies cookies.txt
 ```
+
+The command copies the `sid` cookie into `sesion.json` and checks the session.
+You can delete `cookies.txt` after that.
+
+### Why an import is needed
+
+The extension and the tool are two different programs. The extension writes a
+file. The tool reads the file. The export alone is not enough, because the file
+only sits in your Downloads folder. The import is the step that copies the file
+into the tool session.
 
 ## Option 3: agent reads the session with the Chrome DevTools MCP
 

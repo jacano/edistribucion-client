@@ -322,6 +322,31 @@ def parse_cookies_file(path):
     return cookies
 
 
+def find_cookies_file():
+    """Find the newest cookies file in the Downloads folders."""
+    home = os.path.expanduser("~")
+    candidates = []
+    for folder_name in ("Downloads", "Descargas"):
+        folder = os.path.join(home, folder_name)
+        if not os.path.isdir(folder):
+            continue
+        for entry in os.listdir(folder):
+            lower = entry.lower()
+            if not (lower.endswith(".txt") or lower.endswith(".json")):
+                continue
+            path = os.path.join(folder, entry)
+            try:
+                mtime = os.path.getmtime(path)
+            except OSError:
+                continue
+            score = 1 if "cookie" in lower else 0
+            candidates.append((score, mtime, path))
+    if not candidates:
+        return None
+    candidates.sort(reverse=True)
+    return candidates[0][2]
+
+
 # ---------------------------------------------------------------- CLI helpers
 KIND_LABELS = {"measured": "MEASURED", "estimated": "ESTIMATED",
                "mixed": "MIXED", "no_data": "NO DATA"}
@@ -389,12 +414,26 @@ def cmd_save(args):
 
 
 def cmd_import_cookies(args):
-    cookies = parse_cookies_file(args.file)
+    path = args.file or find_cookies_file()
+    if not path:
+        print("No cookies file given, and none found in Downloads.", file=sys.stderr)
+        sys.exit(1)
+    if not args.file:
+        print("Using", path)
+    cookies = parse_cookies_file(path)
+    if not cookies.get("sid"):
+        print("No sid found in", path, file=sys.stderr)
+        sys.exit(1)
     session = Session(path=args.session)
     session.cookies.update(cookies)
     session.save()
     print("Imported %d cookies into %s" % (len(cookies), args.session))
-    print("sid found:", "yes" if session.cookies.get("sid") else "no")
+    try:
+        account = Client(session).whoami()
+        print("Login OK. User:", account["name"])
+    except Exception as exc:
+        print("Session saved, but the check failed:", exc, file=sys.stderr)
+        sys.exit(1)
 
 
 COOKIE_NAMES = ("sid", "oid", "sid_Client", "inst", "clientSrc")
@@ -431,7 +470,13 @@ def cmd_login(args):
             sys.exit(1)
         session.cookies.update(cookies)
     elif method == "cookies":
-        path = input("Path to cookies.txt [cookies.txt]: ").strip() or "cookies.txt"
+        path = input("Path to cookies.txt [auto]: ").strip()
+        if not path:
+            path = find_cookies_file()
+            if not path:
+                print("No cookies file found in Downloads.", file=sys.stderr)
+                sys.exit(1)
+            print("Using", path)
         cookies = parse_cookies_file(path)
         if not cookies.get("sid"):
             print("No sid found in", path, file=sys.stderr)
@@ -533,7 +578,7 @@ def build_parser():
 
     imp = sub.add_parser("import-cookies", parents=[common],
                          help="import cookies from a cookies.txt (Netscape) or JSON file")
-    imp.add_argument("file", help="path to cookies.txt or JSON export")
+    imp.add_argument("file", nargs="?", help="path to cookies.txt or JSON export (default: newest in Downloads)")
     imp.set_defaults(func=cmd_import_cookies)
 
     login = sub.add_parser("login", parents=[common],
