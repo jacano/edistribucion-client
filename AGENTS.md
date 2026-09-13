@@ -30,7 +30,7 @@ This file tells an LLM agent what this tool is and how to use it.
 
 | command | what it does |
 | --------- | ------------ |
-| `python edistribucion.py report` | full report for a CUPS |
+| `python edistribucion.py report` | full report for every CUPS, all data |
 | `python edistribucion.py login-backend` | log in with user and password, no browser |
 | `python edistribucion.py import-cookies` | import a cookies.txt |
 | `python edistribucion.py save --sid` | store a session value by hand |
@@ -43,7 +43,8 @@ The options `--sid` and `--session` go before or after the command.
 python edistribucion.py report
 ```
 
-This is the full report for one CUPS. It contains:
+This is the full report. It uses all the data available. It gives one report
+for each CUPS of the account, one after another. It contains:
 
 - the CUPS id and the contracted power per period,
 - the real period used,
@@ -53,15 +54,12 @@ This is the full report for one CUPS. It contains:
 - the maximum demanded power per year and per month,
 - a warning when estimated data exists, with the dates.
 
-Options:
+Option:
 
-- `--cups` is only needed when the account has several CUPS. With one CUPS, the
-  tool picks it.
-- `--from YYYY-MM-DD` and `--to YYYY-MM-DD` limit the period.
-- `--json` gives raw JSON.
+- `--json` gives raw JSON. With several CUPS, the JSON is a list.
 
-Each request covers up to 35 days. The tool walks the history in 35-day steps.
-The portal has no data before 2024-01-16.
+Each request covers up to 35 days. The tool walks all the history in 35-day
+steps. The portal has no data before 2024-01-16.
 
 ## Rules for your answer
 

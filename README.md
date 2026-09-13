@@ -4,7 +4,8 @@ This tool reads electricity data from the e-distribucion private area (Endesa
 group) for your own account. It uses HTTP only. It uses only the Python
 standard library.
 
-It gives one thing: a **full report per CUPS**. Each report contains:
+It gives one thing: a **full report**. The report uses all the data available
+and covers every CUPS of the account, one after another. Each report contains:
 
 - the contracted power per period (P1, P2),
 - the real consumption total and the split by P1, P2, P3,
@@ -41,12 +42,13 @@ python edistribucion.py login-backend
 python edistribucion.py report
 ```
 
-Options:
+The report uses all the data available. You do not set a period. The tool finds
+the first and the last date by itself. With several CUPS, it prints one report
+for each CUPS, one after another.
 
-- `--cups <value>` is only needed when the account has several CUPS. With one
-  CUPS, the tool picks it.
-- `--from YYYY-MM-DD` and `--to YYYY-MM-DD` limit the period.
-- `--json` gives raw JSON.
+Option:
+
+- `--json` gives raw JSON. With several CUPS, the JSON is a list.
 
 Example output:
 
