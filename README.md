@@ -71,14 +71,15 @@ Example output:
 Month 2026-09 (available 2026-09-04 -> 2026-09-12)
 CUPS: ES0031...WR0F | contractId: a0ucj...
 Range: 2026-09-04 -> 2026-09-12
-Total: 61.153 kWh | peak demand: 14.683000000000002 kW
-Periods (kWh): {'P3': 16.137, 'P2': 20.779, 'P1': 24.237}
-Measured: 61.153 kWh (192 h) | Estimated: 0.0 kWh (24 h)
+Contracted power: {'P1': 4.0} kW
+Total: 73.411 kWh | peak demand: 14.683000000000002 kW
+Periods (kWh): {'P3': 28.395, 'P2': 20.779, 'P1': 24.237}
+Measured: 73.411 kWh (216 h) | Estimated: 0.0 kWh (0 h)
 
 Daily detail:
   04/09/2026     2.336 kWh  MEASURED  {'P3': 0.781, 'P2': 0.783, 'P1': 0.772}
   ...
-  12/09/2026     0.000 kWh  ESTIMATED {}
+  12/09/2026    12.258 kWh  MEASURED  {'P3': 12.258}
 ```
 
 ## Output fields

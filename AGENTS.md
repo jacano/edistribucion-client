@@ -72,6 +72,7 @@ The summary has these keys:
 | `measured_hours` | count of measured hours |
 | `estimated_hours` | count of estimated hours |
 | `peak_demand_kw` | the maximum demand in the range |
+| `contracted_power_kw` | the contracted power of the supply. Example: `{"P1": 4.0}` |
 | `days` | list of days. Each day has `date`, `kwh`, `periods`, and `kind` |
 
 The `kind` of a day is one of `measured`, `estimated`, `mixed`, or `no_data`.
@@ -82,6 +83,7 @@ The `hourly` list has one row per hour. Each row has `date`, `hour`, `kwh`,
 ## Rules for your answer
 
 - Always report the split by P1, P2, P3.
+- Report the contracted power and the peak demand.
 - Always say if the values are measured or estimated. If a day is estimated, say
   so.
 - Report the date range that the tool used. The available range can be smaller

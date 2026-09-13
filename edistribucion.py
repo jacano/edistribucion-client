@@ -563,12 +563,20 @@ def default_contract(account, supplies, contract):
     return supplies[0]["contract_id"]
 
 
+def contracted_power(supplies, contract):
+    for item in supplies:
+        if item["contract_id"] == contract:
+            return item.get("contracted_power_kw")
+    return None
+
+
 def print_summary(summary, date_from, date_to, contract, as_json):
     if as_json:
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         return
     print("CUPS:", summary["cups"], "| contractId:", contract)
     print("Range:", date_from, "->", date_to)
+    print("Contracted power:", summary.get("contracted_power_kw") or "-", "kW")
     print("Total:", summary["total_kwh"], "kWh | peak demand:", summary["peak_demand_kw"], "kW")
     print("Periods (kWh):", summary["periods_kwh"])
     print("Measured:", summary["measured_kwh"], "kWh (%d h)" % summary["measured_hours"],
@@ -725,6 +733,7 @@ def cmd_month(args):
         date_to = datetime.strptime(info["maxDate"], "%Y-%m-%d").date()
     data = client.get_curve(contract, date_from, date_to.isoformat(), account["visibility_id"])
     summary = summarize(data)
+    summary["contracted_power_kw"] = contracted_power(supplies, contract)
     if not args.json:
         print("Month %s (available %s -> %s)" % (args.month, date_from, date_to.isoformat()))
     print_summary(summary, date_from, date_to.isoformat(), contract, args.json)
@@ -734,7 +743,9 @@ def cmd_range(args):
     client, account, supplies = load_context(args)
     contract = default_contract(account, supplies, args.cont)
     data = client.get_curve(contract, args.date_from, args.date_to, account["visibility_id"])
-    print_summary(summarize(data), args.date_from, args.date_to, contract, args.json)
+    summary = summarize(data)
+    summary["contracted_power_kw"] = contracted_power(supplies, contract)
+    print_summary(summary, args.date_from, args.date_to, contract, args.json)
 
 
 def build_parser():
