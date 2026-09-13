@@ -17,10 +17,6 @@ Session: session.json (or the EDIST_SID environment variable). Commands:
   python edistribucion.py login-backend [--save] # log in with user and password
   python edistribucion.py import-cookies [FILE]  # import a cookies.txt
   python edistribucion.py save --sid "<value>"   # save a value by hand
-  python edistribucion.py cups                   # list supplies
-  python edistribucion.py consume [--cups <CUPS>] [--from YYYY-MM-DD] [--to YYYY-MM-DD]
-                                  [--group hour|month|year] [--json]
-  python edistribucion.py maxpower [--cups <CUPS>] [--from YYYY-MM] [--to YYYY-MM] [--json]
   python edistribucion.py report [--cups <CUPS>] [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--json]
 """
 import argparse
@@ -641,15 +637,6 @@ def resolve_cups(supplies, requested):
     sys.exit(1)
 
 
-def cmd_cups(args):
-    client, account, supplies = load_context(args)
-    for item in supplies:
-        power = client.get_contracted_power(item["contract_id"], account["visibility_id"])
-        if power:
-            item["contracted_power_kw"] = power
-    print(json.dumps(supplies, ensure_ascii=False, indent=2))
-
-
 CHUNK_DAYS = 35
 
 
@@ -780,41 +767,6 @@ def _select_cups(args):
     return client, account, cups, supplies, current, contracted
 
 
-def cmd_consume(args):
-    client, account, cups, supplies, current, contracted = _select_cups(args)
-    data = collect_consumption(client, account, supplies, args.date_from, args.date_to)
-    result = {
-        "cups": cups,
-        "contracted_power_kw": contracted,
-        "from": data["from"].isoformat() if data["from"] else None,
-        "to": data["to"].isoformat() if data["to"] else None,
-        "group": args.group,
-        "real_kwh": round(data["real_kwh"], 3),
-        "estimated_kwh": round(data["estimated_kwh"], 3),
-        "real_hours": data["real_hours"],
-        "estimated_hours": data["estimated_hours"],
-        "periods_real_kwh": {k: round(v, 3) for k, v in data["periods_real_kwh"].items()},
-        "estimated_days": _compress_dates(data["estimated_days"]),
-        "groups": _groups_list(data["groups"][args.group]),
-    }
-    if args.json:
-        print(json.dumps(result, ensure_ascii=False, indent=2))
-        return
-    print("CUPS:", result["cups"], "| contracted power:", result["contracted_power_kw"], "kW")
-    print("Period:", result["from"], "->", result["to"], "| group:", args.group)
-    print("Real:", result["real_kwh"], "kWh (%d h)" % result["real_hours"],
-          "| Estimated:", result["estimated_kwh"], "kWh (%d h)" % result["estimated_hours"])
-    print("Real periods:", result["periods_real_kwh"])
-    if result["estimated_days"]:
-        print("Estimated dates:", ", ".join(result["estimated_days"]))
-    else:
-        print("Estimated dates: none")
-    print("By %s (real kWh | estimated kWh):" % args.group)
-    for group in result["groups"]:
-        print("  %-12s %10.3f | %10.3f" % (
-            group["key"], group["real_kwh"], group["estimated_kwh"]))
-
-
 def _max_demand(client, account, cups_id, year_from, year_to):
     monthly = {}
     for year in range(year_from, year_to + 1):
@@ -906,51 +858,6 @@ def cmd_report(args):
         print("No estimated consumptions. All data is real.")
 
 
-def cmd_maxpower(args):
-    client, account, all_supplies = load_context(args)
-    cups = resolve_cups(all_supplies, args.cups)
-    supplies = [item for item in all_supplies if item["cups"] == cups]
-    current = next((item for item in supplies if not item.get("end")), supplies[-1])
-    cups_id = current.get("cups_id")
-    if not cups_id:
-        print("No CUPS id for the contract.", file=sys.stderr)
-        sys.exit(1)
-    contracted = client.get_contracted_power(current["contract_id"], account["visibility_id"])
-
-    if args.date_to:
-        year, month = [int(part) for part in args.date_to.split("-")[:2]]
-    else:
-        today = date.today()
-        year, month = today.year, today.month
-    end = "%d/%d" % (month, year)
-    if args.date_from:
-        y0, m0 = [int(part) for part in args.date_from.split("-")[:2]]
-    else:
-        total = year * 12 + (month - 1) - 11
-        y0, m0 = total // 12, total % 12 + 1
-    start = "%d/%d" % (m0, y0)
-
-    data = client.get_maximeter(cups_id, account["visibility_id"], start, end)
-    if args.json:
-        data = dict(data)
-        data["contracted_power_kw"] = contracted
-        print(json.dumps(data, ensure_ascii=False, indent=2))
-        return
-
-    print("CUPS:", data.get("cups"), "| contracted power:", contracted, "kW")
-    print("Period:", start, "->", end)
-    print("Maximum:", data.get("maxValue"))
-    print("Monthly maxima:")
-    for point in data.get("lstData", []):
-        if not point.get("valid"):
-            print("  %s  no data" % point.get("date"))
-            continue
-        periods = point.get("periodData") or {}
-        period_txt = " ".join("P%s=%s" % (key[1:], value.get("fmtVal"))
-                              for key, value in periods.items() if value.get("val"))
-        print("  %s  %s kW  %s" % (point.get("date"), point.get("value"), period_txt))
-
-
 def build_parser():
     parser = argparse.ArgumentParser(
         description="Unofficial HTTP-only client for e-distribucion (no browser)")
@@ -980,26 +887,6 @@ def build_parser():
     backend.add_argument("--credentials", default=DEFAULT_CREDENTIALS,
                          help="path to the credentials file")
     backend.set_defaults(func=cmd_login_backend)
-
-    sub.add_parser("cups", parents=[common], help="list supplies").set_defaults(func=cmd_cups)
-
-    consume = sub.add_parser("consume", parents=[common],
-                             help="aggregate consumption by hour, day, month or year")
-    consume.add_argument("--cups", help="the CUPS to aggregate (only needed with several)")
-    consume.add_argument("--from", dest="date_from", help="YYYY-MM-DD")
-    consume.add_argument("--to", dest="date_to", help="YYYY-MM-DD")
-    consume.add_argument("--group", choices=["hour", "month", "year"],
-                         default="month", help="group by hour of day, month or year")
-    consume.add_argument("--json", action="store_true")
-    consume.set_defaults(func=cmd_consume)
-
-    mp = sub.add_parser("maxpower", parents=[common],
-                        help="maximum demanded power per month")
-    mp.add_argument("--cups", help="the CUPS to query (only needed with several)")
-    mp.add_argument("--from", dest="date_from", help="YYYY-MM")
-    mp.add_argument("--to", dest="date_to", help="YYYY-MM")
-    mp.add_argument("--json", action="store_true")
-    mp.set_defaults(func=cmd_maxpower)
 
     report = sub.add_parser("report", parents=[common],
                             help="full report: consumption and power for a CUPS")

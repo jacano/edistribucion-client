@@ -15,88 +15,27 @@ This file tells an LLM agent what this tool is and how to use it.
 - `edistribucion.py` reads electricity data from the e-distribucion private area
   for the user's own account.
 - It uses HTTP only. It uses no browser and no third-party package.
-- It does three things:
-  1. Show the maximum demanded power per month.
-  2. Aggregate real consumption by hour, day, month, or year.
-  3. Find non-real (estimated) data and when it happens.
+- It gives one thing: a full report per CUPS. The report has the real
+  consumption, the estimated consumption, and the power.
 
 ## Before you run it
 
 - Run commands from the folder that holds `edistribucion.py`.
 - The tool needs the session file `session.json`.
-- If a command fails with an authentication error, the session expired. Tell the
-  user to run `python edistribucion.py login-backend`, or let the auto login do
-  it. See `AUTHENTICATION.md`.
+- If the report fails with an authentication error, the session expired. Tell
+  the user to run `python edistribucion.py login-backend`, or let the auto login
+  do it. See `AUTHENTICATION.md`.
 
 ## Commands
 
-Use these commands. Do not guess new ones.
-
 | command | what it does |
 | --------- | ------------ |
-| `python edistribucion.py cups` | list supplies, with the CUPS id and the contracted power per period |
-| `python edistribucion.py consume --group month` | aggregate consumption by hour, day, month, or year |
-| `python edistribucion.py maxpower` | maximum demanded power per month |
-| `python edistribucion.py report` | full report: real consumption and power for a CUPS |
+| `python edistribucion.py report` | full report for a CUPS |
 | `python edistribucion.py login-backend` | log in with user and password, no browser |
 | `python edistribucion.py import-cookies` | import a cookies.txt |
 | `python edistribucion.py save --sid` | store a session value by hand |
 
 The options `--sid` and `--session` go before or after the command.
-
-## consume
-
-```bash
-python edistribucion.py consume --cups ES0031102226226018WR0F --from 2024-01-16 --to 2026-09-12 --group month
-```
-
-- `--cups` is only needed when the account has several CUPS. With one CUPS, the
-  tool picks it. Run `cups` to list the CUPS values.
-- `--group` is `hour`, `month`, or `year`. The default is `month`.
-- `hour` groups by hour of the day (00 to 23).
-- `--from` and `--to` are `YYYY-MM-DD`. Without them, it covers the full
-  history.
-- `--json` gives raw JSON.
-
-The output has these keys:
-
-| key | meaning |
-| --- | ------- |
-| `from`, `to` | the real period used |
-| `group` | the group used |
-| `cups` | the CUPS used |
-| `contracted_power_kw` | the contracted power per period, for example `{"P1": 4.0, "P2": 4.0}` |
-| `real_kwh` | total measured consumption |
-| `estimated_kwh` | total estimated consumption |
-| `real_hours`, `estimated_hours` | count of measured and estimated hours |
-| `periods_real_kwh` | measured total by `P1`, `P2`, `P3` |
-| `estimated_days` | the dates or date ranges with estimated data |
-| `groups` | one entry per group with `key`, `real_kwh`, `estimated_kwh`, `real_hours`, `estimated_hours` |
-
-Each request covers up to 35 days. The tool walks the history in 35-day steps.
-
-## maxpower
-
-```bash
-python edistribucion.py maxpower --cups ES0031102226226018WR0F
-```
-
-- `--cups` is only needed when the account has several CUPS. With one CUPS, the
-  tool picks it. Run `cups` to list the CUPS values.
-- `--from` and `--to` are `YYYY-MM`. The default is the last 12 months.
-- `--json` gives raw JSON.
-
-The output has these keys:
-
-| key | meaning |
-| --- | ------- |
-| `requestedPower` | the contracted power in kW |
-| `maxValue` | the single maximum, with the date and the time |
-| `lstData` | one point per month |
-
-A point with `valid: false` means no data for that month. A valid point has
-`value` (the monthly maximum in kW) and `periodData` with the maxima per period.
-`T1` is `P1`, `T2` is `P2`, and `T3` is `P3`.
 
 ## report
 
@@ -106,14 +45,23 @@ python edistribucion.py report
 
 This is the full report for one CUPS. It contains:
 
-- the contracted power per period,
+- the CUPS id and the contracted power per period,
+- the real period used,
+- the real consumption total and the split by `P1`, `P2`, `P3`,
 - the consumption by year, month, and hour, with real and estimated values,
 - the maximum consumption in one hour per year,
 - the maximum demanded power per year and per month,
 - a warning when estimated data exists, with the dates.
 
-Options: `--cups` (only needed with several CUPS), `--from YYYY-MM-DD`,
-`--to YYYY-MM-DD`, `--json`.
+Options:
+
+- `--cups` is only needed when the account has several CUPS. With one CUPS, the
+  tool picks it.
+- `--from YYYY-MM-DD` and `--to YYYY-MM-DD` limit the period.
+- `--json` gives raw JSON.
+
+Each request covers up to 35 days. The tool walks the history in 35-day steps.
+The portal has no data before 2024-01-16.
 
 ## Rules for your answer
 

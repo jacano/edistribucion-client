@@ -4,20 +4,17 @@ This tool reads electricity data from the e-distribucion private area (Endesa
 group) for your own account. It uses HTTP only. It uses only the Python
 standard library.
 
-It does three things:
+It gives one thing: a **full report per CUPS**. Each report contains:
 
-1. Show the maximum demanded power per month.
-2. Aggregate real consumption by hour, day, month, or year.
-3. Find non-real (estimated) data and when it happens.
+- the contracted power per period (P1, P2),
+- the real consumption total and the split by P1, P2, P3,
+- the real consumption by year, month, and hour,
+- the maximum consumption in one hour per year,
+- the maximum demanded power per year and per month,
+- a warning when estimated data exists, with the dates.
 
 Warning: this tool is not official. It is not connected to e-distribucion or
 Endesa. Use it only with your own account. The portal can change at any time.
-
-## How it works
-
-The portal is a Salesforce Experience Cloud site. The session is the `sid`
-cookie. The tool also needs a short-lived anti-CSRF token. The server sends that
-token in a cookie on the first request. The tool copies it and reuses it.
 
 ## Requirements
 
@@ -38,73 +35,50 @@ Get the session with one of these commands. Full steps are in
 python edistribucion.py login-backend
 ```
 
-## Commands
+## Report
 
 ```bash
-# List supplies. Shows the CUPS id and the contracted power per period (P1, P2).
-python edistribucion.py cups
-
-# Aggregate consumption by month (default).
-python edistribucion.py consume
-
-# Aggregate by hour of the day, month, or year.
-python edistribucion.py consume --group hour
-python edistribucion.py consume --group month
-python edistribucion.py consume --group year
-
-# Limit the period.
-python edistribucion.py consume --from 2024-01-16 --to 2026-09-12 --group month
-
-# Maximum demanded power per month.
-python edistribucion.py maxpower
-
-# Full report: real consumption and power for the CUPS.
 python edistribucion.py report
-
-# JSON output.
-python edistribucion.py consume --group year --json
 ```
 
-Add `--cups <value>` only when the account has several CUPS. With one CUPS, the
-tool picks it. The command `cups` lists the values.
+Options:
 
-The options `--sid` and `--session` go before or after the command.
+- `--cups <value>` is only needed when the account has several CUPS. With one
+  CUPS, the tool picks it.
+- `--from YYYY-MM-DD` and `--to YYYY-MM-DD` limit the period.
+- `--json` gives raw JSON.
 
 Example output:
 
 ```
-CUPS: ES0031102226226018WR0F | contracted power: {'P1': 4.0, 'P2': 4.0} kW
-Period: 2024-01-16 -> 2026-09-12 | group: month
-Real: 5797.054 kWh (15911 h) | Estimated: 2743.035 kWh (7390 h)
-Real periods: {'P1': 1890.896, 'P2': 1704.069, 'P3': 2202.089}
-Estimated dates: 2024-03-02..2024-04-03, 2025-07-23..2025-12-09, ...
-By month (real kWh | estimated kWh):
-  2024-01        123.456 |      0.000
-  ...
+REPORT
+CUPS: ES0031102226226018WR0F | cups_id: a0r2400000GIpw1AAD
+Contracted power: {'P1': 4.0, 'P2': 4.0} kW
+Period: 2024-01-16 -> 2026-09-12
+
+REAL CONSUMPTION
+  Total: 5797.054 kWh in 15911 hours
+  Periods: {'P1': 1890.896, 'P2': 1704.069, 'P3': 2202.089}
+  By year (real | estimated kWh):
+    2024    2007.799 |    595.531
+    ...
+  By month (real | estimated kWh):
+    2024-03      11.335 |    225.435
+    ...
+
+MAX HOURLY CONSUMPTION
+  2025  3.625 kWh  (02/02/2025 21 - 22 h)
+
+MAX DEMANDED POWER (monthly, from the portal)
+  2025  5.024 kW  (20-02-2025)
+
+WARNING: there are estimated consumptions.
+  Estimated: 2743.035 kWh in 7390 hours
+  Estimated dates: 2024-03-02..2024-04-03, ...
 ```
 
-## Output fields
-
-`consume` returns these keys:
-
-| key | meaning |
-| --- | ------- |
-| `cups` | the CUPS used |
-| `contracted_power_kw` | the contracted power of the supply |
-| `real_kwh` | total measured consumption |
-| `estimated_kwh` | total estimated consumption |
-| `real_hours`, `estimated_hours` | count of measured and estimated hours |
-| `periods_real_kwh` | measured total by `P1`, `P2`, `P3` |
-| `estimated_days` | the dates with estimated data |
-| `groups` | one entry per group, with real and estimated values |
-
-`maxpower` returns these keys:
-
-| key | meaning |
-| --- | ------- |
-| `requestedPower` | the contracted power in kW |
-| `maxValue` | the single maximum, with the date and the time |
-| `lstData` | one point per month, with the maxima per period |
+Each request covers up to 35 days. The tool walks the history in 35-day steps.
+The portal has no data before 2024-01-16.
 
 ## Security
 
