@@ -9,7 +9,8 @@ and covers every CUPS of the account, one after another. Each report contains:
 
 - the contracted power per period (P1, P2),
 - the real consumption total and the split by P1, P2, P3,
-- the real consumption by year, month, and hour,
+- the real and estimated consumption by year (with the P1, P2, P3 split),
+  month, and hour,
 - the maximum consumption in one hour per year,
 - the maximum demanded power per year and per month,
 - a warning when estimated data exists, with the dates.
@@ -56,16 +57,20 @@ Example output:
 REPORT
 CUPS: ES0031102226226018WR0F | cups_id: a0r2400000GIpw1AAD
 Contracted power: {'P1': 4.0, 'P2': 4.0} kW
-Period: 2024-01-16 -> 2026-09-12
+Period: 2024-01-16 -> 2026-09-14
 
 REAL CONSUMPTION
-  Total: 5797.054 kWh in 15911 hours
-  Periods: {'P1': 1890.896, 'P2': 1704.069, 'P3': 2202.089}
+  Total: 5797.068 kWh in 15911 hours
+  Periods: {'P1': 1890.9, 'P2': 1704.064, 'P3': 2202.104}
   By year (real | estimated kWh):
-    2024    2007.799 |    595.531
-    ...
+    2024    2007.797 |    595.522
+      P1   606.608 |  165.083
+      P2   596.359 |  182.676
+      P3   804.830 |  247.763
+    2025    2613.067 |    912.146
+      ...
   By month (real | estimated kWh):
-    2024-03      11.335 |    225.435
+    2024-03      11.335 |    225.417
     ...
 
 MAX HOURLY CONSUMPTION
@@ -75,14 +80,15 @@ MAX DEMANDED POWER (monthly, from the portal)
   2025  5.024 kW  (20-02-2025)
 
 WARNING: there are estimated consumptions.
-  Estimated: 2743.035 kWh in 7390 hours
+  Estimated: 2742.983 kWh in 7438 hours
   Estimated dates: 2024-03-02..2024-04-03, ...
 ```
 
-The tool asks the portal for one zip with the hourly curves and reads it. This
-is much faster than one call per month. The period (P1, P2, P3) is worked out
-from the 2.0TD calendar. All the details are in
-[TARIFF_2_0TD.md](TARIFF_2_0TD.md). The portal has no data before 2024-01-16.
+The tool asks the portal for one zip with the hourly curves and reads it. Then
+it deletes the zip from the portal. This is much faster than one call per month.
+The period (P1, P2, P3) is worked out from the 2.0TD calendar. All the details
+are in [TARIFF_2_0TD.md](TARIFF_2_0TD.md). The portal has no data before
+2024-01-16.
 
 ## Security
 

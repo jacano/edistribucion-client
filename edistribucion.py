@@ -84,6 +84,9 @@ ACTIONS = {
     "get_files": ("WP_Download_Transfer_CTRL.getFiles",
                   "apex://WP_Download_Transfer_CTRL/ACTION$getFiles",
                   "markup://c:WP_Download_Transfer_Table"),
+    "delete_file": ("WP_Download_Transfer_CTRL.deleteFile",
+                    "apex://WP_Download_Transfer_CTRL/ACTION$deleteFile",
+                    "markup://c:WP_Download_Transfer_Table"),
     "maximeter": ("WP_MaximeterHistogram_CTRL.getHistogramPoints",
                   "apex://WP_MaximeterHistogram_CTRL/ACTION$getHistogramPoints",
                   "markup://c:WP_MaximeterHistogramDetail"),
@@ -390,6 +393,9 @@ class Client:
     def get_files(self, visibility_id):
         params = {"roleId": visibility_id, "type": ["01", "50", "51"]}
         return self.call("get_files", params, DOWNLOAD_PAGE).get("data", {})
+
+    def delete_file(self, transfer_id):
+        return self.call("delete_file", {"transferId": transfer_id}, DOWNLOAD_PAGE)
 
     def download_file(self, fileid):
         """Return the raw bytes of a file that get_files lists."""
@@ -737,7 +743,12 @@ def _download_measure_zip(client, account, contracts):
         files = client.get_files(visibility).get("lstFiles") or []
         fresh = [item for item in files if item.get("fileid") not in known]
         if fresh:
-            return client.download_file(fresh[0]["fileid"])
+            payload = client.download_file(fresh[0]["fileid"])
+            try:
+                client.delete_file(fresh[0]["Id"])
+            except Exception:
+                pass
+            return payload
     raise RuntimeError("The portal did not make the zip in time.")
 
 
@@ -745,6 +756,7 @@ def collect_consumption(client, account, contracts):
     """Read the full history from the zip and return the aggregates."""
     groups = {"year": {}, "month": {}, "hour": {}}
     periods_real = {"P1": 0.0, "P2": 0.0, "P3": 0.0}
+    periods_year = {}
     total_real = total_estimated = 0.0
     real_hours = estimated_hours = 0
     estimated_days = set()
@@ -767,6 +779,7 @@ def collect_consumption(client, account, contracts):
 
     for (day, hour), (kwh, real) in sorted(hours.items()):
         hour_key = "%02d" % hour
+        period = tariff_period(day, hour)
         for group, gkey in (("year", "%04d" % day.year),
                             ("month", "%04d-%02d" % (day.year, day.month)),
                             ("hour", hour_key)):
@@ -777,11 +790,13 @@ def collect_consumption(client, account, contracts):
             else:
                 entry["estimated_kwh"] += kwh
                 entry["estimated_hours"] += 1
+        year_slot = periods_year.setdefault(day.year, {name: {"real": 0.0, "estimated": 0.0}
+                                                       for name in ("P1", "P2", "P3")})
+        year_slot[period]["real" if real else "estimated"] += kwh
         label = "%02d - %02d h" % (hour, hour + 1)
         if real:
             total_real += kwh
             real_hours += 1
-            period = tariff_period(day, hour)
             if period in periods_real:
                 periods_real[period] += kwh
             if day.year not in year_peak or kwh > year_peak[day.year][0]:
@@ -801,6 +816,7 @@ def collect_consumption(client, account, contracts):
     return {
         "groups": groups,
         "periods_real_kwh": periods_real,
+        "periods_year": periods_year,
         "real_kwh": total_real,
         "estimated_kwh": total_estimated,
         "real_hours": real_hours,
@@ -846,6 +862,8 @@ def _print_report(result):
     for group in result["consumption_by_year"]:
         print("    %s  %10.3f | %10.3f" % (
             group["key"], group["real_kwh"], group["estimated_kwh"]))
+        for name, slot in result["periods_by_year"].get(group["key"], {}).items():
+            print("      %s  %8.3f | %8.3f" % (name, slot["real"], slot["estimated"]))
     print("  By month (real | estimated kWh):")
     for group in result["consumption_by_month"]:
         print("    %s  %10.3f | %10.3f" % (
@@ -903,6 +921,10 @@ def cmd_report(args):
             "real_hours": data["real_hours"],
             "estimated_hours": data["estimated_hours"],
             "periods_real_kwh": {k: round(v, 3) for k, v in data["periods_real_kwh"].items()},
+            "periods_by_year": {str(year): {name: {"real": round(slot["real"], 3),
+                                                   "estimated": round(slot["estimated"], 3)}
+                                            for name, slot in sorted(periods.items())}
+                                for year, periods in sorted(data["periods_year"].items())},
             "has_estimated": bool(data["estimated_days"]),
             "estimated_days": _compress_dates(data["estimated_days"]),
             "consumption_by_year": _groups_list(data["groups"]["year"]),

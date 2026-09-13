@@ -49,7 +49,8 @@ for each CUPS of the account, one after another. It contains:
 - the CUPS id and the contracted power per period,
 - the real period used,
 - the real consumption total and the split by `P1`, `P2`, `P3`,
-- the consumption by year, month, and hour, with real and estimated values,
+- the consumption by year (with the P1, P2, P3 split), month, and hour, with
+  real and estimated values,
 - the maximum consumption in one hour per year,
 - the maximum demanded power per year and per month,
 - a warning when estimated data exists, with the dates.
@@ -59,8 +60,8 @@ Option:
 - `--json` gives raw JSON. With several CUPS, the JSON is a list.
 
 The tool asks the portal for one zip with the hourly curves (action
-`createZip`), waits for it, and reads it. The period (P1, P2, P3) comes from the
-2.0TD calendar, not from a data call.
+`createZip`), waits for it, and reads it. Then it deletes the zip. The period
+(P1, P2, P3) comes from the 2.0TD calendar, not from a data call.
 
 The portal has no data before 2024-01-16.
 
