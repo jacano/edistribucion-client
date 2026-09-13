@@ -294,11 +294,12 @@ def summarize(data):
     }
 
 
-def parse_cookies_file(path):
+def parse_cookies_file(path, domain=None):
     """Read a cookies file. Accepts Netscape cookies.txt or a JSON export.
 
     The browser extension 'Get cookies.txt LOCALLY' writes the Netscape format.
-    Return a dict of name -> value.
+    When `domain` is given, keep only cookies for that domain. Return a dict of
+    name -> value.
     """
     text = open(path, encoding="utf-8", errors="replace").read()
     cookies = {}
@@ -309,8 +310,11 @@ def parse_cookies_file(path):
             data = data.get("cookies", data)
         for item in data:
             name = item.get("name")
-            if name:
-                cookies[name] = item.get("value")
+            if not name:
+                continue
+            if domain and domain not in (item.get("domain") or "").lower():
+                continue
+            cookies[name] = item.get("value")
     else:
         for line in text.splitlines():
             line = line.strip()
@@ -318,6 +322,8 @@ def parse_cookies_file(path):
                 continue
             parts = line.split("\t")
             if len(parts) >= 7:
+                if domain and domain not in parts[0].lower():
+                    continue
                 cookies[parts[5]] = parts[6]
     return cookies
 
@@ -426,7 +432,7 @@ def cmd_import_cookies(args):
         sys.exit(1)
     if not args.file:
         print("Using", path)
-    cookies = parse_cookies_file(path)
+    cookies = parse_cookies_file(path, domain="edistribucion")
     if not cookies.get("sid"):
         print("No sid found in", path, file=sys.stderr)
         sys.exit(1)
@@ -483,7 +489,7 @@ def cmd_login(args):
                 print("No cookies file found in Downloads.", file=sys.stderr)
                 sys.exit(1)
             print("Using", path)
-        cookies = parse_cookies_file(path)
+        cookies = parse_cookies_file(path, domain="edistribucion")
         if not cookies.get("sid"):
             print("No sid found in", path, file=sys.stderr)
             sys.exit(1)
