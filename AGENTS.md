@@ -37,6 +37,7 @@ Use these commands. Do not guess new ones.
 | `python edistribucion.py cups` | list supplies, with the CUPS id and the contracted power per period |
 | `python edistribucion.py consume --group month` | aggregate consumption by hour, day, month, or year |
 | `python edistribucion.py maxpower` | maximum demanded power per month |
+| `python edistribucion.py report` | full report: real consumption and power for a CUPS |
 | `python edistribucion.py login-backend` | log in with user and password, no browser |
 | `python edistribucion.py import-cookies` | import a cookies.txt |
 | `python edistribucion.py save --sid` | store a session value by hand |
@@ -96,6 +97,23 @@ The output has these keys:
 A point with `valid: false` means no data for that month. A valid point has
 `value` (the monthly maximum in kW) and `periodData` with the maxima per period.
 `T1` is `P1`, `T2` is `P2`, and `T3` is `P3`.
+
+## report
+
+```bash
+python edistribucion.py report
+```
+
+This is the full report for one CUPS. It contains:
+
+- the contracted power per period,
+- the real consumption total and the split by year, month, and hour,
+- the maximum consumption in one hour per year,
+- the maximum demanded power per year and per month,
+- a warning when estimated data exists, with the dates.
+
+Options: `--cups` (only needed with several CUPS), `--from YYYY-MM-DD`,
+`--to YYYY-MM-DD`, `--json`.
 
 ## Rules for your answer
 

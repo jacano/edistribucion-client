@@ -58,6 +58,9 @@ python edistribucion.py consume --from 2024-01-16 --to 2026-09-12 --group month
 # Maximum demanded power per month.
 python edistribucion.py maxpower
 
+# Full report: real consumption and power for the CUPS.
+python edistribucion.py report
+
 # JSON output.
 python edistribucion.py consume --group year --json
 ```
