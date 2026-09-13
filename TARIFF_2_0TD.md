@@ -64,6 +64,42 @@ The tool checks the month and the day, so it works for every year.
 Easter is the common error. Easter has no fixed date, so it does not count as
 off-peak. The whole of Easter week uses the normal periods of a working day.
 
+## What the law says (BOE)
+
+The Circular 3/2020 has the exact rule in Article 7, point 3. The original
+text in Spanish says:
+
+> Se consideran horas punta, llano y valle las siguientes: ... (Península,
+> Illes Balears y Canarias) P1: 10 h-14 h y 18 h-22 h; P2: 8 h-10 h, 14 h-18 h
+> y 22 h-24 h; P3: 0 h-8 h. Se consideran como horas del periodo 3 (valle)
+> todas las horas de los sábados, domingos, el 6 de enero y los días festivos
+> de ámbito nacional, definidos como tales en el calendario oficial del año
+> correspondiente, con exclusión tanto de los festivos sustituibles como de
+> los que no tienen fecha fija.
+
+In Simple English: the peak, flat and off-peak hours are the ones in the table.
+All the hours of a Saturday, a Sunday, 6 January and a national holiday are
+off-peak. A national holiday counts only when it is in the official calendar
+of that year. A holiday with a moveable date, or a holiday that can move to
+another day, does not count.
+
+This is the reason for the two rules in this tool:
+
+- Easter has no fixed date, so Easter is not off-peak.
+- 6 January is off-peak. The law writes it on its own, and it is also a fixed
+  national holiday.
+
+The law gives two sets of hours:
+
+- Península, Illes Balears and Canarias: P1 10 h-14 h and 18 h-22 h.
+- Ceuta and Melilla: P1 11 h-15 h and 19 h-23 h, P2 8 h-11 h, 15 h-19 h and
+  23 h-24 h, P3 0 h-8 h.
+
+This tool uses the hours of the Península, Illes Balears and Canarias.
+
+The link to the law: <https://www.boe.es/buscar/act.php?id=BOE-A-2020-1066>
+(Article 7, point 3).
+
 ## How the tool works out the period
 
 The tool uses this function. The input is the date and the start hour of the
@@ -133,4 +169,5 @@ days, which the portal did not have yet.
   <https://preciluz.com/dias-festivos-luz/>
 - Plenitude, "Tarifa 2.0TD de Luz":
   <https://eniplenitude.es/blog/actualidad/nuevo-recibo-de-la-luz/>
-- Circular 3/2020 of the CNMC, BOE-A-2020-1066.
+- Circular 3/2020 of the CNMC, Article 7, BOE-A-2020-1066:
+  <https://www.boe.es/buscar/act.php?id=BOE-A-2020-1066>
