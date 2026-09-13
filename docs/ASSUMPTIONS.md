@@ -39,6 +39,14 @@ differ. Read this list before you trust a number.
 
 ## 5. The zip from the portal
 
+- The tool gets the hourly history from the massive download, as one zip. It
+  does not use the per-range API `WP_Measure_v3_CTRL.getChartPointsByRange`.
+- That per-range API gives the hourly curve, but only for a short range (about
+  35 days in the test account). The full history needs one call for each range
+  (33 calls in the test account). That does not scale.
+- Both methods give the same result. In the test the real total and the split
+  by P1, P2 and P3 were the same, with a difference of about 0.01 kWh. That
+  difference is the rounding of the CSV (3 decimals).
 - The tool asks for the hourly zip (`downloadType=1`). The portal also has a
   quarter-hourly zip.
 - The tool waits up to 180 seconds for the zip. The portal makes the zip in the

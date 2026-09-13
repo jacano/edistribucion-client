@@ -127,9 +127,15 @@ ESTIMATED MAP (R real, E estimated, M mixed, . no data)
 ```
 
 The tool asks the portal for one zip with the hourly curves and reads it. Then
-it deletes the zip from the portal. This is much faster than one call per month.
-The period (P1, P2, P3) is worked out from the 2.0TD calendar. All the details
-are in [docs/TARIFF_2_0TD.md](docs/TARIFF_2_0TD.md).
+it deletes the zip from the portal. The period (P1, P2, P3) is worked out from
+the 2.0TD calendar. All the details are in
+[docs/TARIFF_2_0TD.md](docs/TARIFF_2_0TD.md).
+
+The tool does not use the per-range API
+`WP_Measure_v3_CTRL.getChartPointsByRange`. It gives the curve, but only about
+35 days per call, so the full history needs many calls and does not scale. The
+zip needs one request, and the result is the same. See
+[docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md).
 
 The report shows the tariff. When the tariff is not 2.0TD, the tool stops with
 an error and gives no report data. The full list of assumptions and limits is

@@ -72,6 +72,9 @@ The tool asks the portal for one zip with the hourly curves (action
 `createZip`), waits for it, and reads it. Then it deletes the zip. The period
 (P1, P2, P3) comes from the 2.0TD calendar, not from a data call.
 
+The tool does not use the per-range API `getChartPointsByRange`: it covers only
+about 35 days per call, so the full history needs many calls and does not scale.
+
 The report shows the tariff. When the tariff is not 2.0TD, the tool stops with
 an error and gives no report data.
 

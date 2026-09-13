@@ -13,9 +13,11 @@ How it works (Salesforce Experience Cloud / Aura):
   - Actions are invoked with POST to `/s/sfsites/aura` using
     message / aura.context / aura.pageURI / aura.token.
   - The full hourly history comes as one zip from `WP_Measure_v3_CTRL.createZip`
-    (the "massive download" page). This needs far fewer calls than one call per
-    month of data. The period (P1 / P2 / P3) is worked out from the date and the
-    hour with the 2.0TD calendar.
+    (the "massive download" page). The per-range API
+    `WP_Measure_v3_CTRL.getChartPointsByRange` is not used: it covers only about
+    35 days per call, so the full history needs many calls and does not scale.
+    The period (P1 / P2 / P3) is worked out from the date and the hour with the
+    2.0TD calendar.
 
 Session: session.json (or the EDIST_SID environment variable). Commands:
   python edistribucion.py login-backend [--save] # log in with user and password
