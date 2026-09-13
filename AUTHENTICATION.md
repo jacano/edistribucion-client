@@ -1,156 +1,48 @@
 # Authentication
 
-The starting point is the tool. Run the `login` command. The tool opens the
-e-distribucion login page. Log in to the portal. Then choose how to return the
-session.
+The session is the `sid` cookie. The tool needs that value. There are four ways
+to give it. All of them write the file `sesion.json`.
+
+## `login` (recommended)
+
+This command opens the portal and reads the session from your running Chrome
+with the DevTools Protocol. It does not launch a new browser. The DevTools
+Protocol sees HttpOnly cookies, so no code injection is needed.
+
+Turn on remote debugging one time in Chrome:
+
+1. Open `chrome://inspect/#remote-debugging`.
+2. Turn on Remote debugging.
+
+Use:
+
+1. Run the command.
 
 ```bash
 python edistribucion.py login
 ```
 
-The tool shows three ways:
+2. The portal opens. Log in if needed.
+3. If Chrome asks for permission, click Allow.
+4. The tool reads the `sid` cookie and writes `sesion.json`.
 
-```
-  paste    copy the Cookie header (or a cURL line) from DevTools and paste it here
-  cookies  import a cookies.txt file
-  agent    let the agent read it with the Chrome DevTools MCP
+Options:
 
-Type paste, cookies or agent [paste]:
-```
+- `--profile-dir PATH` points to another Chrome user data directory.
+- `--timeout SECONDS` changes the wait. The default is 180.
 
-You can pick the way in advance with `--method`:
+How it works: Chrome writes `DevToolsActivePort` in its user data directory. The
+tool reads that file, connects to Chrome, and calls `Storage.getCookies`.
 
-```bash
-python edistribucion.py login --method paste
-```
+## `login-backend`
 
-All ways write `sesion.json`. The session is the `sid` cookie.
-
-## Option 1: paste a line from DevTools
-
-This option needs no extra tool.
-
-1. Log in to the portal.
-2. Open DevTools. Press F12.
-3. Open the Network tab.
-4. Click a request to the portal, for example one named `aura`.
-5. Open Headers, then Request Headers. Copy the value of `Cookie`.
-6. Paste the value in the tool. Press Enter.
-
-The tool finds the `sid` value in the text.
-
-You can also copy a full request line:
-
-1. Right-click a request in the Network tab.
-2. Select Copy, then "Copy as cURL".
-3. Paste the whole line in the tool. Press Enter.
-
-The tool finds the `sid` value in the cURL line.
-
-## Option 2: import a cookies file
-
-This option uses a browser extension. The extension can read the cookie store,
-because Chrome trusts it. The tool cannot. So the extension writes the cookies
-to a file, and the tool reads that file.
-
-### Install the extension
-
-One example is "Get cookies.txt LOCALLY":
-
-`https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc`
-
-1. Open the link in Chrome.
-2. Click "Add to Chrome".
-3. Click "Add extension" in the dialog.
-4. Pin the extension. Click the puzzle piece icon, then the pin next to the
-   extension name.
-
-Any extension that exports the Netscape `cookies.txt` format works.
-
-### Export the cookies
-
-Do this after you log in, and only when the session expired.
-
-1. Log in to the portal.
-2. Click the extension icon.
-3. Select the current site or the export option.
-4. Select the Netscape format, if the extension asks.
-5. Click "Export" or "Download". The file goes to your Downloads folder. The
-   usual name is `cookies.txt`.
-
-### Import the cookies
-
-The tool finds the newest cookies file in your Downloads folder. You can also
-type the path.
-
-```bash
-python edistribucion.py import-cookies
-```
-
-Or give the path:
-
-```bash
-python edistribucion.py import-cookies cookies.txt
-```
-
-The command copies the `sid` cookie into `sesion.json` and checks the session.
-You can delete `cookies.txt` after that.
-
-### Why an import is needed
-
-The extension and the tool are two different programs. The extension writes a
-file. The tool reads the file. The export alone is not enough, because the file
-only sits in your Downloads folder. The import is the step that copies the file
-into the tool session.
-
-## Option 3: agent reads the session with the Chrome DevTools MCP
-
-This option is for an agent. The agent uses the `chrome-devtools` MCP with
-autoconnect. That MCP attaches to your normal Chrome. It does not change your
-profile.
-
-What you need:
-
-- The `chrome-devtools` MCP with autoconnect. You configured it already.
-- Remote debugging turned on one time.
-
-Turn on remote debugging:
-
-1. Open `chrome://inspect/#remote-debugging`.
-2. Turn on Remote debugging.
-3. When the agent connects, Chrome asks for permission. Click Allow.
-
-Steps:
-
-1. Log in to the portal in Chrome.
-2. Ask the agent: "capture my e-distribucion session".
-3. The agent reads the `Cookie` header of a portal request with the MCP.
-4. The agent saves the session in one of two ways.
-
-```bash
-python edistribucion.py save --sid "<sid value>"
-```
-
-```bash
-python edistribucion.py save --text "<Cookie header>"
-```
-
-5. The tool writes `sesion.json` and checks the session.
-
-This option works because the MCP reads the request, not the page. The request
-carries the HttpOnly `sid` cookie. The page cannot see it. The request can.
-
-## Option 4: backend login with user and password
-
-This option logs in with the portal login call. No browser. It sends the user
-and the password to the portal.
+This command logs in with the portal login call. No browser.
 
 ```bash
 python edistribucion.py login-backend
 ```
 
-The command asks for the NIF and the password. Then it logs in and writes
-`sesion.json`.
+It asks for the NIF and the password. Then it writes `sesion.json`.
 
 Add `--save` to store the credentials:
 
@@ -159,13 +51,11 @@ python edistribucion.py login-backend --save
 ```
 
 The credentials go to `credenciales.json`. The password is encrypted with the
-Windows Data Protection API (DPAPI). Only your Windows user can decrypt it.
-The file holds no clear password.
+Windows Data Protection API (DPAPI). Only your Windows user can decrypt it. The
+file holds no clear password.
 
-### Auto login
-
-When `credenciales.json` exists, auto login is on. Any command that finds the
-session expired logs in again with the stored credentials. You see this line:
+Auto login: when `credenciales.json` exists, any command that finds the session
+expired logs in again with the stored credentials. You see this line:
 
 ```
 Stored session expired. Logged in again with the stored credentials.
@@ -173,100 +63,41 @@ Stored session expired. Logged in again with the stored credentials.
 
 To turn auto login off, delete `credenciales.json`.
 
-Tests showed that a plain login request does not set the session. The portal
-completes the login with a redirect chain:
+## `import-cookies`
 
-1. The login call returns `null`, but the response holds the frontdoor URL.
-2. `frontdoor.jsp` sets the `sid` cookie.
-3. The login flow finishes on the community landing page.
-4. The home page sets the `aura.token` cookie.
+This command reads a `cookies.txt` file (the Netscape format) or a JSON export.
+The browser extension "Get cookies.txt LOCALLY" writes that format. The tool
+keeps only the cookies of the portal domain.
 
-The tool follows this chain for you.
-
-## Option 5: Chrome window login
-
-This option opens a Chrome window. You log in on the official site. The tool
-reads the session cookie with the DevTools Protocol. That protocol sees HttpOnly
-cookies, so no code injection is needed.
+The tool finds the newest cookies file in your Downloads folder. You can also
+give the path.
 
 ```bash
-python edistribucion.py login-chrome
+python edistribucion.py import-cookies
 ```
-
-1. Chrome opens with its own profile. It does not touch your main profile.
-2. Log in to the portal in that window.
-3. The tool reads the `sid` cookie, writes `sesion.json`, and closes Chrome.
-
-Options:
-
-- `--keep-open` leaves Chrome open.
-- `--profile-dir PATH` changes the profile folder.
-- `--port PORT` changes the debug port.
-- `--timeout SECONDS` changes the wait time.
-
-The profile stays on disk. On the next run, Chrome may still hold the session.
-
-## Option 6: attach to your running Chrome
-
-This option uses your normal Chrome. Nothing is launched. The tool connects to
-Chrome with the DevTools Protocol and reads the session cookie. The DevTools
-Protocol sees HttpOnly cookies, so no code injection is needed.
-
-Turn on remote debugging one time:
-
-1. Open `chrome://inspect/#remote-debugging` in Chrome.
-2. Turn on Remote debugging.
-
-Use:
-
-1. Log in to the portal in Chrome.
-2. Run the command.
 
 ```bash
-python edistribucion.py login-attach
+python edistribucion.py import-cookies cookies.txt
 ```
 
-3. If Chrome asks for permission, click Allow.
-4. The tool reads the `sid` cookie, writes `sesion.json`, and checks the session.
+## `save`
 
-Options:
-
-- `--profile-dir PATH` points to another Chrome user data directory.
-- `--timeout SECONDS` changes the wait.
-
-How it works: Chrome writes a file `DevToolsActivePort` in its user data
-directory. The file holds the port and the WebSocket path. The tool reads that
-file, connects to `ws://127.0.0.1:<port>/devtools/browser/...`, and calls
-`Storage.getCookies`. That call returns the HttpOnly `sid`.
-
-## Direct options
-
-You can also skip the menu.
-
-Save the `sid` value directly.
+This command stores a value that you already have. It is used by an agent or by
+hand.
 
 ```bash
 python edistribucion.py save --sid "<sid value>"
 ```
 
-Pass the `sid` value on each command.
+`--text` accepts a whole `Cookie` header, or a cURL line:
 
 ```bash
-python edistribucion.py month --month 2026-09 --sid "<sid value>"
-```
-
-Use the environment variable `EDIST_SID`.
-
-```bash
-set EDIST_SID=<sid value>
-python edistribucion.py status
+python edistribucion.py save --text "renderCtx=x; sid=00D...!AQEA...; oid=00D"
 ```
 
 ## Notes
 
-- The `sid` cookie is HttpOnly. A web page cannot read it. The DevTools or an
-  extension can read it.
-- Do not share `sesion.json`. It is your live session.
-- When a command fails with an authentication error, run `login` again. The
-  session expired.
-- The `aura.token` refreshes on each call. You do not manage it.
+- The `sid` cookie is HttpOnly. A web page cannot read it. The DevTools
+  Protocol, an extension, or the portal itself can read it.
+- Do not share `sesion.json` or `credenciales.json`.
+- When the session expires, run `login` again, or let the auto login do it.

@@ -28,28 +28,16 @@ POST requests to `/s/sfsites/aura`.
 
 ## Authentication
 
-Start with the `login` command. It opens the e-distribucion login page. Then it
-offers two ways to return the session to the tool:
+Get the session with one of these commands. Full steps are in
+[AUTHENTICATION.md](AUTHENTICATION.md).
 
-1. Paste a line from DevTools (the `Cookie` header, or "Copy as cURL").
-2. Import a `cookies.txt` file.
-
-There is also a backend login. The tool sends the user and the password to the
-portal, follows the login chain, and saves the session. It can store the
-credentials encrypted with the Windows DPAPI. When the session expires, the tool
-logs in again with the stored credentials.
-
-There is also a Chrome attach login. The tool connects to your running Chrome
-with the DevTools Protocol and reads the session cookie. Nothing is launched.
-
-There is also a Chrome window login. The tool opens Chrome with its own profile,
-you log in, and the tool reads the session cookie with the DevTools Protocol.
-
-An agent with the Chrome DevTools MCP can also read the `Cookie` header of a
-portal request and save the session. You can also pass the session directly with
-`--sid`.
-
-Full steps are in [AUTHENTICATION.md](AUTHENTICATION.md).
+- `login` reads the session from your running Chrome with the DevTools Protocol.
+  Turn on remote debugging one time in `chrome://inspect/#remote-debugging`.
+- `login-backend` logs in with the user and the password. No browser. Add
+  `--save` to store the credentials encrypted with the Windows DPAPI. Then the
+  tool logs in again when the session expires.
+- `import-cookies` reads a `cookies.txt` file.
+- `save --sid` stores a value that you already have.
 
 ```bash
 python edistribucion.py login

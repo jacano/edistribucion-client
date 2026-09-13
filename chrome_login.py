@@ -1,42 +1,28 @@
 #!/usr/bin/env python3
 """
-Launch Chrome, let the user log in, and capture the session cookie.
+Read the portal session from the running Chrome over the DevTools Protocol.
 
-The tool starts Chrome with its own profile and a remote debugging port. It
-connects over the DevTools Protocol and reads the `sid` cookie. The DevTools
+The user logs in to the portal in their normal Chrome. This module connects to
+Chrome with the DevTools Protocol and reads the `sid` cookie. The DevTools
 Protocol sees HttpOnly cookies, so no code injection is needed.
+
+The user turns on remote debugging one time:
+
+    chrome://inspect/#remote-debugging
+
+Chrome then writes `DevToolsActivePort` in its user data directory. This module
+reads that file, connects to the browser WebSocket endpoint, and calls
+`Storage.getCookies`.
 
 Standard library only: the WebSocket client is small and built in.
 """
 import base64
-import hashlib
 import json
 import os
 import socket
 import struct
-import subprocess
-import sys
 import time
-import urllib.request
 from urllib.parse import urlparse
-
-CHROME_CANDIDATES = [
-    os.path.join(os.environ.get("ProgramFiles", ""), "Google", "Chrome", "Application", "chrome.exe"),
-    os.path.join(os.environ.get("ProgramFiles(x86)", ""), "Google", "Chrome", "Application", "chrome.exe"),
-    os.path.join(os.environ.get("LOCALAPPDATA", ""), "Google", "Chrome", "Application", "chrome.exe"),
-]
-
-
-def find_chrome():
-    for path in CHROME_CANDIDATES:
-        if path and os.path.exists(path):
-            return path
-    return None
-
-
-def default_profile_dir():
-    base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
-    return os.path.join(base, "edistribucion-client", "chrome-profile")
 
 
 # ---------------------------------------------------------------- websocket
@@ -101,7 +87,7 @@ def ws_recv(sock):
         length = struct.unpack(">Q", _read_exact(sock, 8))[0]
     payload = _read_exact(sock, length)
     if opcode == 0x9:  # ping
-        sock.sendall(b"\x8a\x80" + b"\x00\x00\x00\x00")
+        sock.sendall(b"\x8a\x80\x00\x00\x00\x00")
         return ws_recv(sock)
     if opcode == 0x8:  # close
         raise RuntimeError("WebSocket closed by peer.")
@@ -130,87 +116,14 @@ class DevTools:
             pass
 
 
-def wait_devtools(port, timeout=40):
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        try:
-            with urllib.request.urlopen("http://127.0.0.1:%d/json/version" % port, timeout=2) as response:
-                return json.loads(response.read().decode("utf-8", "replace"))["webSocketDebuggerUrl"]
-        except Exception:
-            time.sleep(0.5)
-    raise RuntimeError("Chrome did not open the debugging port %d." % port)
-
-
-def _kill_profile(profile_dir):
-    if os.name != "nt":
-        return
-    script = ("Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | "
-              "Where-Object { $_.CommandLine -like '*%s*' } | "
-              "ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" % profile_dir.replace("'", "''"))
-    try:
-        subprocess.run(["powershell", "-NoProfile", "-Command", script], capture_output=True, timeout=30)
-    except Exception:
-        pass
-
-
-def capture_sid(login_url, profile_dir=None, port=9333, timeout=300, keep_open=False):
-    """Open Chrome, wait for the user to log in, return the sid cookie."""
-    chrome = find_chrome()
-    if not chrome:
-        raise RuntimeError("Chrome not found. Install Chrome.")
-    profile_dir = profile_dir or default_profile_dir()
-    os.makedirs(profile_dir, exist_ok=True)
-
-    ws_url = None
-    try:
-        ws_url = wait_devtools(port, timeout=3)
-    except Exception:
-        args = [
-            chrome,
-            "--user-data-dir=" + profile_dir,
-            "--remote-debugging-port=%d" % port,
-            "--remote-allow-origins=*",
-            "--no-first-run",
-            "--no-default-browser-check",
-            "--restore-last-session",
-            login_url,
-        ]
-        subprocess.Popen(args)
-        ws_url = wait_devtools(port, timeout=60)
-
-    tools = DevTools(ws_url)
-    sid = None
-    try:
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            result = tools.call("Storage.getCookies")
-            for cookie in result.get("cookies", []):
-                if cookie.get("name") == "sid" and "edistribucion" in cookie.get("domain", ""):
-                    sid = cookie.get("value")
-                    break
-            if sid:
-                break
-            time.sleep(1)
-    finally:
-        tools.close()
-        if not keep_open:
-            _kill_profile(profile_dir)
-    return sid
-
-
+# ---------------------------------------------------------------- capture
 def default_user_data_dir():
     base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
     return os.path.join(base, "Google", "Chrome", "User Data")
 
 
-def capture_sid_from_running(user_data_dir=None, timeout=30):
-    """Read the portal sid from the running Chrome over the DevTools Protocol.
-
-    Chrome must have remote debugging on (chrome://inspect/#remote-debugging).
-    Chrome then writes `DevToolsActivePort` in the user data directory. This
-    function reads that file and connects to the browser WebSocket endpoint.
-    The DevTools Protocol sees HttpOnly cookies.
-    """
+def capture_sid(user_data_dir=None, timeout=30):
+    """Read the portal sid from the running Chrome. Return None if not found."""
     user_data_dir = user_data_dir or default_user_data_dir()
     port_file = os.path.join(user_data_dir, "DevToolsActivePort")
     if not os.path.exists(port_file):
@@ -239,6 +152,4 @@ def capture_sid_from_running(user_data_dir=None, timeout=30):
 
 
 if __name__ == "__main__":
-    url = sys.argv[1] if len(sys.argv) > 1 else "https://zonaprivada.edistribucion.com/areaprivada/s/login/"
-    value = capture_sid(url, keep_open="--keep-open" in sys.argv)
-    print("sid:", "found" if value else "not found")
+    print("sid:", "found" if capture_sid() else "not found")

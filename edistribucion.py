@@ -14,9 +14,10 @@ How it works (Salesforce Experience Cloud / Aura):
     message / aura.context / aura.pageURI / aura.token.
 
 Session: sesion.json (or the EDIST_SID environment variable). Commands:
-  python edistribucion.py login
-  python edistribucion.py login-backend [--save]
-  python edistribucion.py save --sid "<sid cookie value>"
+  python edistribucion.py login                  # read the session from Chrome
+  python edistribucion.py login-backend [--save] # log in with user and password
+  python edistribucion.py import-cookies FILE    # import a cookies.txt
+  python edistribucion.py save --sid "<value>"   # save a value by hand
   python edistribucion.py status
   python edistribucion.py cups
   python edistribucion.py periods [--cont <contId>]
@@ -642,48 +643,20 @@ def extract_cookies_from_text(text):
 
 
 def cmd_login(args):
-    print("Opening the login page in your browser...")
+    from chrome_login import capture_sid
+    print("Opening the portal login page in your browser...")
     webbrowser.open(BASE + LOGIN_PAGE)
-    print()
-    print("Log in to the portal. Then choose how to return the session.")
-    print()
-    print("  paste    copy the Cookie header (or a cURL line) from DevTools and paste it here")
-    print("  cookies  import a cookies.txt file")
-    print("  agent    let the agent read it with the Chrome DevTools MCP")
-    print()
-    method = args.method or (input("Type paste, cookies or agent [paste]: ").strip().lower() or "paste")
-
-    session = Session(path=args.session)
-    if method == "paste":
-        text = input("Paste the Cookie header or cURL line: ").strip()
-        cookies = extract_cookies_from_text(text)
-        if not cookies.get("sid"):
-            print("No sid found in the text.", file=sys.stderr)
-            sys.exit(1)
-        session.cookies.update(cookies)
-    elif method == "cookies":
-        path = input("Path to cookies.txt [auto]: ").strip()
-        if not path:
-            path = find_cookies_file()
-            if not path:
-                print("No cookies file found in Downloads.", file=sys.stderr)
-                sys.exit(1)
-            print("Using", path)
-        cookies = parse_cookies_file(path, domain="edistribucion")
-        if not cookies.get("sid"):
-            print("No sid found in", path, file=sys.stderr)
-            sys.exit(1)
-        session.cookies.update(cookies)
-    elif method == "agent":
-        print("Ask the agent: 'capture my e-distribucion session'.")
-        print("The agent reads the Cookie header with the Chrome DevTools MCP,")
-        print("then runs:  python edistribucion.py save --sid \"<sid value>\"")
-        return
-    else:
-        print("Unknown method:", method, file=sys.stderr)
-        print("Use paste, cookies or agent.", file=sys.stderr)
+    print("Log in. Then the tool reads the session from Chrome.")
+    print("Chrome needs remote debugging on: chrome://inspect/#remote-debugging")
+    try:
+        sid = capture_sid(user_data_dir=args.profile_dir, timeout=args.timeout)
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
         sys.exit(1)
-
+    if not sid:
+        print("No session found. Log in to the portal and run login again.", file=sys.stderr)
+        sys.exit(1)
+    session = Session(sid=sid, path=args.session)
     session.save()
     print("Session saved to", args.session)
     try:
@@ -724,49 +697,6 @@ def cmd_login_backend(args):
     if args.save:
         path = save_credentials(username, password, args.credentials)
         print("Credentials saved (encrypted with Windows DPAPI) to", path)
-    try:
-        account = Client(session).whoami()
-        print("Login OK. User:", account["name"])
-    except Exception as exc:
-        print("Session saved, but the check failed:", exc, file=sys.stderr)
-        sys.exit(1)
-
-
-def cmd_login_chrome(args):
-    from chrome_login import capture_sid
-    print("Opening Chrome. Log in to the portal in that window.")
-    print("The tool captures the session when the login is done.")
-    sid = capture_sid(BASE + LOGIN_PAGE, profile_dir=args.profile_dir,
-                      port=args.port, timeout=args.timeout, keep_open=args.keep_open)
-    if not sid:
-        print("No session captured.", file=sys.stderr)
-        sys.exit(1)
-    session = Session(sid=sid, path=args.session)
-    session.save()
-    print("Session saved to", args.session)
-    try:
-        account = Client(session).whoami()
-        print("Login OK. User:", account["name"])
-    except Exception as exc:
-        print("Session saved, but the check failed:", exc, file=sys.stderr)
-        sys.exit(1)
-
-
-def cmd_login_attach(args):
-    from chrome_login import capture_sid_from_running
-    print("Reading the session from your running Chrome...")
-    try:
-        sid = capture_sid_from_running(user_data_dir=args.profile_dir, timeout=args.timeout)
-    except Exception as exc:
-        print(str(exc), file=sys.stderr)
-        sys.exit(1)
-    if not sid:
-        print("No portal session found. Log in to the portal in Chrome, then try again.",
-              file=sys.stderr)
-        sys.exit(1)
-    session = Session(sid=sid, path=args.session)
-    session.save()
-    print("Session saved to", args.session)
     try:
         account = Client(session).whoami()
         print("Login OK. User:", account["name"])
@@ -855,9 +785,9 @@ def build_parser():
     imp.set_defaults(func=cmd_import_cookies)
 
     login = sub.add_parser("login", parents=[common],
-                           help="open the login page and save the session")
-    login.add_argument("--method", choices=["paste", "cookies", "agent"],
-                       help="paste, cookies or agent")
+                           help="open the portal and read the session from Chrome")
+    login.add_argument("--profile-dir", help="Chrome user data dir")
+    login.add_argument("--timeout", type=int, default=180)
     login.set_defaults(func=cmd_login)
 
     backend = sub.add_parser("login-backend", parents=[common],
@@ -869,20 +799,6 @@ def build_parser():
     backend.add_argument("--credentials", default=DEFAULT_CREDENTIALS,
                          help="path to the credentials file")
     backend.set_defaults(func=cmd_login_backend)
-
-    chrome_login = sub.add_parser("login-chrome", parents=[common],
-                                  help="open Chrome and capture the session after you log in")
-    chrome_login.add_argument("--profile-dir", help="Chrome user data dir for the tool")
-    chrome_login.add_argument("--port", type=int, default=9333)
-    chrome_login.add_argument("--timeout", type=int, default=300)
-    chrome_login.add_argument("--keep-open", action="store_true", help="leave Chrome open")
-    chrome_login.set_defaults(func=cmd_login_chrome)
-
-    attach = sub.add_parser("login-attach", parents=[common],
-                            help="read the session from your running Chrome (DevTools)")
-    attach.add_argument("--profile-dir", help="Chrome user data dir")
-    attach.add_argument("--timeout", type=int, default=30)
-    attach.set_defaults(func=cmd_login_attach)
 
     sub.add_parser("status", parents=[common],
                    help="account and supplies").set_defaults(func=cmd_status)
