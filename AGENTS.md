@@ -2,6 +2,14 @@
 
 This file tells an LLM agent what this tool is and how to use it.
 
+## Language
+
+- Write everything in English. This includes file names, code, messages, and
+  documents.
+- Use Simple English. Use short sentences. Use the active voice. One word means
+  one thing.
+- Keep each instruction under 20 words and each description under 25 words.
+
 ## What this tool is
 
 - `edistribucion.py` is a command line tool.
@@ -22,7 +30,7 @@ Use it when the user asks for:
 ## Before you run it
 
 - Run commands from the folder that holds `edistribucion.py`.
-- The tool needs the session file `sesion.json`.
+- The tool needs the session file `session.json`.
 - If a command fails with an authentication error, the session expired. Tell the
   user to run `python edistribucion.py login-backend`, or let the auto login do
   it. See `AUTHENTICATION.md`.
@@ -78,7 +86,7 @@ The `hourly` list has one row per hour. Each row has `date`, `hour`, `kwh`,
   so.
 - Report the date range that the tool used. The available range can be smaller
   than the range you asked for.
-- Do not print the session cookie or the file `sesion.json`.
+- Do not print the session cookie or the file `session.json`.
 - This tool reads data only. Do not try to change data on the portal.
 
 ## Examples

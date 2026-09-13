@@ -108,7 +108,7 @@ seconds.
 
 ## Security
 
-The file `sesion.json` holds your live session cookie. The `.gitignore` file
+The file `session.json` holds your live session cookie. The `.gitignore` file
 excludes this file. Do not commit it. Do not share it.
 
 The client reads data from your own account only.

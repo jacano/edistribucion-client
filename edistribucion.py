@@ -13,7 +13,7 @@ How it works (Salesforce Experience Cloud / Aura):
   - Actions are invoked with POST to `/s/sfsites/aura` using
     message / aura.context / aura.pageURI / aura.token.
 
-Session: sesion.json (or the EDIST_SID environment variable). Commands:
+Session: session.json (or the EDIST_SID environment variable). Commands:
   python edistribucion.py login-backend [--save] # log in with user and password
   python edistribucion.py import-cookies FILE    # import a cookies.txt
   python edistribucion.py save --sid "<value>"   # save a value by hand
@@ -47,8 +47,8 @@ MEASURELIST_PAGE = "/areaprivada/s/wp-measurelist-v4"
 DETAIL_PAGE = "/areaprivada/s/wp-measure-detail-v4"
 
 DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_SESSION = os.path.join(DIR, "sesion.json")
-DEFAULT_CREDENTIALS = os.path.join(DIR, "credenciales.json")
+DEFAULT_SESSION = os.path.join(DIR, "session.json")
+DEFAULT_CREDENTIALS = os.path.join(DIR, "credentials.json")
 USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36")
 
@@ -646,7 +646,7 @@ def cmd_login_backend(args):
     if not (username and password) and os.path.exists(args.credentials):
         username, password = load_credentials(args.credentials)
     if not username:
-        username = input("NIF/Pasaporte/NIE: ").strip()
+        username = input("NIF, passport or NIE: ").strip()
     if not password:
         password = getpass.getpass("Password: ")
     if not (username and password):

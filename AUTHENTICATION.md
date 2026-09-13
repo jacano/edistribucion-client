@@ -1,7 +1,7 @@
 # Authentication
 
 The session is the `sid` cookie. The tool needs that value. There are three
-ways to give it. All of them write the file `sesion.json`.
+ways to give it. All of them write the file `session.json`.
 
 ## `login-backend` (recommended)
 
@@ -11,8 +11,8 @@ This command logs in with the portal login call. No browser.
 python edistribucion.py login-backend
 ```
 
-It uses the stored credentials if `credenciales.json` exists. If not, it asks
-for the NIF and the password. Then it writes `sesion.json`.
+It uses the stored credentials if `credentials.json` exists. If not, it asks
+for the NIF and the password. Then it writes `session.json`.
 
 Add `--save` to store the credentials:
 
@@ -20,18 +20,18 @@ Add `--save` to store the credentials:
 python edistribucion.py login-backend --save
 ```
 
-The credentials go to `credenciales.json`. The password is encrypted with the
+The credentials go to `credentials.json`. The password is encrypted with the
 Windows Data Protection API (DPAPI). Only your Windows user can decrypt it. The
 file holds no clear password.
 
-Auto login: when `credenciales.json` exists, any command that finds the session
+Auto login: when `credentials.json` exists, any command that finds the session
 expired logs in again with the stored credentials. You see this line:
 
 ```
 Stored session expired. Logged in again with the stored credentials.
 ```
 
-To turn auto login off, delete `credenciales.json`.
+To turn auto login off, delete `credentials.json`.
 
 How it works: the tool calls the portal login action. The response holds the
 frontdoor URL with a pre-session. The tool follows the chain (frontdoor, login
@@ -78,6 +78,6 @@ python edistribucion.py save --text "renderCtx=x; sid=00D...!AQEA...; oid=00D"
 
 - The `sid` cookie is HttpOnly. A web page cannot read it. The portal itself, or
   the browser cookie panel, can read it.
-- Do not share `sesion.json` or `credenciales.json`.
+- Do not share `session.json` or `credentials.json`.
 - When the session expires, run `login-backend` again, or let the auto login do
   it.
