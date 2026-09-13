@@ -413,6 +413,30 @@ def cmd_login(args):
         sys.exit(1)
 
 
+def cmd_login_proxy(args):
+    try:
+        from proxy_login import capture_sid
+    except ImportError:
+        print("This command needs the `cryptography` package.", file=sys.stderr)
+        print("Install it with: pip install cryptography", file=sys.stderr)
+        sys.exit(1)
+    print("Opening Chrome with a temporary profile. Log in to the portal there.")
+    print("The window closes when the tool captures the session.")
+    sid, ca_path = capture_sid(BASE + LOGIN_PAGE, port=args.port, timeout=args.timeout)
+    if not sid:
+        print("No session captured. Try again.", file=sys.stderr)
+        print("If the page did not load, trust this certificate and retry:", ca_path, file=sys.stderr)
+        sys.exit(1)
+    session = Session(sid=sid, path=args.session)
+    session.save()
+    print("Session saved to", args.session)
+    try:
+        account = Client(session).whoami()
+        print("Login OK. User:", account["name"])
+    except Exception as exc:
+        print("Session saved, but the check failed:", exc, file=sys.stderr)
+
+
 # ---------------------------------------------------------------- callback flow
 def parse_callback_url(url):
     """Extract the JSON payload from an edist://callback?data=... URL."""
@@ -593,6 +617,12 @@ def build_parser():
 
     login = sub.add_parser("login", help="open the login page and save the sid cookie")
     login.set_defaults(func=cmd_login)
+
+    proxy = sub.add_parser("login-proxy",
+                           help="capture the session with a local proxy (needs cryptography)")
+    proxy.add_argument("--port", type=int, default=8765)
+    proxy.add_argument("--timeout", type=int, default=240)
+    proxy.set_defaults(func=cmd_login_proxy)
 
     book = sub.add_parser("bookmarklet", help="print the bookmarklet code")
     book.set_defaults(func=cmd_bookmarklet)
