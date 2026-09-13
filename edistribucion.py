@@ -119,6 +119,11 @@ ACTIONS = {
 FIXED_HOLIDAYS = {(1, 1), (1, 6), (5, 1), (8, 15), (10, 12), (11, 1), (12, 6), (12, 8), (12, 25)}
 
 
+def log(message):
+    """Write a progress line to stderr, so stdout stays clean."""
+    print(message, file=sys.stderr)
+
+
 # ---------------------------------------------------------------- session/HTTP
 class Session:
     """Holds the session cookies and persists them to disk."""
@@ -319,6 +324,7 @@ class Client:
     def token(self, page_uri, force=False):
         if not force and page_uri in self._tokens:
             return self._tokens[page_uri]
+        log("  token: GET %s" % page_uri)
         status, headers, _ = self._request(
             "GET", BASE + page_uri,
             extra_headers={"Accept": "text/html,application/xhtml+xml"})
@@ -335,6 +341,7 @@ class Client:
     # --- generic Aura call ---
     def call(self, action, params, page_uri, retry=True):
         route, descriptor, calling = ACTIONS[action]
+        log("  call: %s" % route)
         token = self.token(page_uri)
         message = json.dumps({"actions": [{"id": "1;a", "descriptor": descriptor,
                                            "callingDescriptor": calling, "params": params}]},
@@ -601,6 +608,7 @@ def auto_login(args):
 
 def load_context(args):
     client = build_client(args)
+    log("Checking the session...")
     try:
         account = client.whoami()
     except Exception:
@@ -612,6 +620,7 @@ def load_context(args):
             account = None
         if account is None:
             raise
+    log("Reading the list of supplies...")
     supplies = client.list_supplies(account["visibility_id"])
     return client, account, supplies
 
@@ -743,6 +752,7 @@ def _download_measure_zip(client, account, contracts):
     appears in the download list, then returns its bytes.
     """
     visibility = account["visibility_id"]
+    log("Asking the portal for the hourly curves...")
     listing = client.list_measure_cups(visibility).get("data") or {}
     wanted = {item["contract_id"] for item in contracts}
     contract_ids = [value for value in (listing.get("lstIds") or []) if value in wanted]
@@ -755,17 +765,24 @@ def _download_measure_zip(client, account, contracts):
     end = datetime.strptime(max(ends), "%Y-%m-%d").strftime("%d/%m/%Y")
 
     known = {item.get("fileid") for item in (client.get_files(visibility).get("lstFiles") or [])}
+    log("Requesting the zip (%s -> %s). The portal makes it in the background." % (start, end))
     client.create_zip(visibility, contract_ids, records, start, end)
-    for _ in range(60):
+    for attempt in range(60):
         time.sleep(3)
+        log("  Waiting for the zip... %d s" % ((attempt + 1) * 3))
         files = client.get_files(visibility).get("lstFiles") or []
         fresh = [item for item in files if item.get("fileid") not in known]
         if fresh:
-            payload = client.download_file(fresh[0]["fileid"])
+            title = fresh[0].get("Title")
+            fileid = fresh[0]["fileid"]
+            log("Zip ready: %s. Downloading..." % title)
+            payload = client.download_file(fileid)
+            log("Downloaded %.1f KiB. Deleting the zip from the portal." % (len(payload) / 1024.0))
             try:
                 client.delete_file(fresh[0]["Id"])
-            except Exception:
-                pass
+                log("Zip deleted.")
+            except Exception as exc:
+                log("Could not delete the zip: %s" % exc)
             return payload
     raise RuntimeError("The portal did not make the zip in time.")
 
@@ -794,6 +811,7 @@ def collect_consumption(client, account, contracts):
             old = hours.get(key)
             if old is None or (real and not old[1]):
                 hours[key] = (kwh, real)
+    log("Read %d hours from the zip." % len(hours))
 
     for (day, hour), (kwh, real) in sorted(hours.items()):
         hour_key = "%02d" % hour
@@ -918,10 +936,15 @@ def cmd_report(args):
     for cups in names:
         group = [item for item in supplies if item["cups"] == cups]
         current = next((item for item in group if not item.get("end")), group[-1])
+        log("CUPS %s" % cups)
         data = collect_consumption(client, account, group)
         if not data["from"]:
+            log("  No data for this CUPS.")
             continue
+        log("Reading the contracted power...")
         contracted = client.get_contracted_power(current["contract_id"], visibility)
+        log("Reading the maximum demanded power (%d-%d)..."
+            % (data["from"].year, data["to"].year))
         monthly_power = _max_demand(client, account, current["cups_id"],
                                     data["from"].year, data["to"].year)
         year_power = {}

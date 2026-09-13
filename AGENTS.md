@@ -63,6 +63,9 @@ Option:
 
 - `--json` gives raw JSON. With several CUPS, the JSON is a list.
 
+The tool writes the progress of each step to stderr. The report, or the JSON,
+goes to stdout. So `--json` stays correct when you capture the output.
+
 The tool asks the portal for one zip with the hourly curves (action
 `createZip`), waits for it, and reads it. Then it deletes the zip. The period
 (P1, P2, P3) comes from the 2.0TD calendar, not from a data call.
