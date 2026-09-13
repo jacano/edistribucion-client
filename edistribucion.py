@@ -803,6 +803,7 @@ def collect_consumption(client, account, contracts, listing):
     year_peak = {}
     month_peak = {}
     first = last = None
+    last_real = None
     hours = {}
 
     def bucket(group, key):
@@ -841,6 +842,8 @@ def collect_consumption(client, account, contracts, listing):
         if real:
             total_real += kwh
             real_hours += 1
+            if last_real is None or day > last_real:
+                last_real = day
             if day.year not in year_peak or kwh > year_peak[day.year][0]:
                 year_peak[day.year] = (kwh, day.strftime("%d/%m/%Y"), label)
             month_key = "%04d-%02d" % (day.year, day.month)
@@ -869,6 +872,7 @@ def collect_consumption(client, account, contracts, listing):
         "month_peak": month_peak,
         "from": first,
         "to": last,
+        "last_real": last_real,
     }
 
 
@@ -997,6 +1001,9 @@ def _print_report(result):
     if result["has_estimated"]:
         print("ESTIMATED DATES")
         print("  " + ", ".join(result["estimated_days"]))
+        if result["last_real"] and result["last_real"] < result["to"]:
+            print("NOTE: the last readings are estimated. The last real day is %s."
+                  % result["last_real"])
     else:
         print("No estimated data. All the data is real.")
 
@@ -1038,6 +1045,7 @@ def cmd_report(args):
             "contracted_power_kw": contracted,
             "from": data["from"].isoformat(),
             "to": data["to"].isoformat(),
+            "last_real": data["last_real"].isoformat() if data["last_real"] else None,
             "real_kwh": round(data["real_kwh"], 3),
             "estimated_kwh": round(data["estimated_kwh"], 3),
             "real_hours": data["real_hours"],
