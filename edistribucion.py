@@ -905,11 +905,16 @@ def _print_report(result):
     print("Period:", result["from"], "->", result["to"])
     print()
     print("CONSUMPTION")
-    print("  Total real:", result["real_kwh"], "kWh in", hours_days(result["real_hours"]))
-    print("  Total estimated:", result["estimated_kwh"], "kWh in",
-          hours_days(result["estimated_hours"]))
-    print("  Periods real:", result["periods_real_kwh"])
-    print("  Periods estimated:", result["periods_estimated_kwh"])
+    names = sorted(result["periods_real_kwh"])
+    print("  %-11s %10s %16s  %s" % ("Consumption", "kWh", "hours",
+                                     "  ".join("%9s" % name for name in names)))
+    for label, kwh, hours, periods in (
+            ("Real", result["real_kwh"], result["real_hours"], result["periods_real_kwh"]),
+            ("Estimated", result["estimated_kwh"], result["estimated_hours"],
+             result["periods_estimated_kwh"])):
+        cells = "  ".join("%9.3f" % periods.get(name, 0.0) for name in names)
+        print("  %-11s %10.3f %16s  %s" % (
+            label, kwh, "%d h (%d d)" % (hours, round(hours / 24.0)), cells))
     print("  By year (real | estimated kWh, real | estimated hours):")
     for group in result["consumption_by_year"]:
         print("    %s  %10.3f | %10.3f  | %6d h (%3d d) | %6d h (%3d d)" % (

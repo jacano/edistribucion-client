@@ -81,10 +81,9 @@ Contracted power: {'P1': 4.0, 'P2': 4.0} kW
 Period: 2024-01-16 -> 2026-09-14
 
 CONSUMPTION
-  Total real: 5797.068 kWh in 15911 hours (663 days)
-  Total estimated: 2742.983 kWh in 7438 hours (310 days)
-  Periods real: {'P1': 1890.9, 'P2': 1704.064, 'P3': 2202.104}
-  Periods estimated: {'P1': 810.04, 'P2': 657.056, 'P3': 1275.887}
+  Consumption        kWh            hours         P1         P2         P3
+  Real          5797.068  15911 h (663 d)   1890.900   1704.064   2202.104
+  Estimated     2742.983   7438 h (310 d)    810.040    657.056   1275.887
   By year (real | estimated kWh, real | estimated hours):
     2024    2007.797 |    595.522  |   6265 h (261 d) |   2158 h ( 90 d)
       P1   606.608 |  165.083
