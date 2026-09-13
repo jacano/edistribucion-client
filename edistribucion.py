@@ -420,9 +420,14 @@ def cmd_login_proxy(args):
         print("This command needs the `cryptography` package.", file=sys.stderr)
         print("Install it with: pip install cryptography", file=sys.stderr)
         sys.exit(1)
-    print("Opening Chrome with a temporary profile. Log in to the portal there.")
-    print("The window closes when the tool captures the session.")
-    sid, ca_path = capture_sid(BASE + LOGIN_PAGE, port=args.port, timeout=args.timeout)
+    print("Opening Chrome with your normal profile. Log in to the portal there.")
+    print("Chrome must be closed first. Use --force to close it automatically.")
+    try:
+        sid, ca_path = capture_sid(BASE + LOGIN_PAGE, port=args.port, timeout=args.timeout,
+                                   user_data_dir=args.profile_dir, force=args.force)
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        sys.exit(1)
     if not sid:
         print("No session captured. Try again.", file=sys.stderr)
         print("If the page did not load, trust this certificate and retry:", ca_path, file=sys.stderr)
@@ -622,6 +627,8 @@ def build_parser():
                            help="capture the session with a local proxy (needs cryptography)")
     proxy.add_argument("--port", type=int, default=8765)
     proxy.add_argument("--timeout", type=int, default=240)
+    proxy.add_argument("--profile-dir", help="Chrome user data dir (default: your normal profile)")
+    proxy.add_argument("--force", action="store_true", help="close Chrome automatically")
     proxy.set_defaults(func=cmd_login_proxy)
 
     book = sub.add_parser("bookmarklet", help="print the bookmarklet code")

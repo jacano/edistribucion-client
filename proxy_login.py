@@ -228,28 +228,53 @@ class LoginProxy:
             pos = low.find(b"set-cookie:", pos + 1)
 
 
-def _kill_profile(profile):
+def default_user_data_dir():
+    base = os.environ.get("LOCALAPPDATA")
+    if base:
+        return os.path.join(base, "Google", "Chrome", "User Data")
+    return None
+
+
+def chrome_running():
+    if os.name != "nt":
+        return False
+    try:
+        out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq chrome.exe", "/NH"],
+                             capture_output=True, text=True, timeout=15).stdout
+        return "chrome.exe" in out.lower()
+    except Exception:
+        return False
+
+
+def kill_chrome():
     if os.name != "nt":
         return
-    script = ("Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | "
-              "Where-Object { $_.CommandLine -like '*%s*' } | "
-              "ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" % profile.replace("'", "''"))
     try:
-        subprocess.run(["powershell", "-NoProfile", "-Command", script],
+        subprocess.run(["taskkill", "/F", "/IM", "chrome.exe"],
                        capture_output=True, timeout=30)
     except Exception:
         pass
 
 
-def capture_sid(login_url, port=8765, timeout=240):
-    """Start the proxy, open Chrome, and return the captured sid cookie."""
+def capture_sid(login_url, port=8765, timeout=240, user_data_dir=None, force=False):
+    """Use the normal Chrome profile through the proxy and return the sid cookie.
+
+    Chrome allows one instance per profile. So Chrome must be closed first.
+    After the capture, Chrome reopens without the proxy.
+    """
     chrome = find_chrome()
     if not chrome:
-        raise RuntimeError("Chrome not found. Pass the path or install Chrome.")
+        raise RuntimeError("Chrome not found. Install Chrome or pass the path.")
+    profile = user_data_dir or default_user_data_dir()
+    if chrome_running():
+        if not force:
+            raise RuntimeError("Chrome is open. Close it first, or run with --force.")
+        kill_chrome()
+        time.sleep(2)
+
     result = {}
     proxy = LoginProxy(port, lambda sid: result.setdefault("sid", sid))
     proxy.start()
-    profile = tempfile.mkdtemp(prefix="edist-login-profile-")
     args = [
         chrome,
         "--user-data-dir=" + profile,
@@ -257,6 +282,7 @@ def capture_sid(login_url, port=8765, timeout=240):
         "--ignore-certificate-errors",
         "--no-first-run",
         "--no-default-browser-check",
+        "--restore-last-session",
         login_url,
     ]
     subprocess.Popen(args)
@@ -266,7 +292,9 @@ def capture_sid(login_url, port=8765, timeout=240):
             time.sleep(0.5)
     finally:
         proxy.close()
-        _kill_profile(profile)
+        kill_chrome()
+    time.sleep(1)
+    subprocess.Popen([chrome, "--restore-last-session"])
     return result.get("sid"), proxy.ca.ca_path
 
 

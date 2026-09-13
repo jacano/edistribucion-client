@@ -92,7 +92,10 @@ manual.
 
 ## Proxy login
 
-This flow captures the session without an extension and without a bookmark.
+This flow captures the session without an extension and without a bookmark. It
+uses your normal Chrome profile. So it keeps your settings and your logins.
+
+Chrome allows one instance per profile. Close Chrome first, or use `--force`.
 
 1. Install the optional dependency.
 
@@ -100,25 +103,29 @@ This flow captures the session without an extension and without a bookmark.
 pip install cryptography
 ```
 
-2. Run the command.
+2. Close Chrome.
+3. Run the command.
 
 ```bash
 python edistribucion.py login-proxy
 ```
 
-3. A Chrome window opens with a temporary profile.
-4. Log in to the portal in that window.
-5. The tool reads the `sid` cookie from the login response. It saves the
-   session and closes the window.
+Add `--force` to let the tool close Chrome for you:
+
+```bash
+python edistribucion.py login-proxy --force
+```
+
+4. Chrome opens with your normal profile, through the proxy.
+5. Log in to the portal.
+6. The tool reads the `sid` cookie, saves it, and reopens Chrome without the
+   proxy.
 
 Only the login goes through the proxy. Later commands use plain HTTP with the
 saved cookie.
 
 If the login page does not load, trust the printed `ca.crt` file. Then run the
 command again. The proxy uses HTTP/1.1 so the headers stay readable.
-
-The temporary Chrome profile is separate. It does not touch your normal
-profile.
 
 ## Bridge extension
 
