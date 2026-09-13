@@ -23,38 +23,23 @@ Endesa. Use it only with your own account. The portal can change at any time.
 
 - Python 3.9 or newer.
 
-## Install as a tool
+## Install
 
-Install the tool from the folder of the project (the folder with
-`pyproject.toml`):
+From the folder of the project (the folder with `pyproject.toml`):
 
 ```bash
-pipx install .        # recommended when you have pipx
+pipx install .        # recommended; or: pip install .
 ```
 
-```bash
-pip install .         # else use pip
-```
-
-The install gives you the command `edistribucion`. Then run the report:
+This gives the command `edistribucion`. Then run the report:
 
 ```bash
-edistribucion          # the same as: edistribucion report
-edistribucion report
+edistribucion           # the same as: edistribucion report
 edistribucion report --json
 ```
 
-You can also run the file without installing it:
-
-```bash
-python edistribucion.py report
-```
-
-The tool looks for `session.json` and `credentials.json` in the folder of the
-file, the current folder, and the user config folder
-(`%APPDATA%\edistribucion` on Windows, `~/.config/edistribucion` on Linux and
-macOS). So the installed tool works from any folder. Full steps are in
-[INSTALL.md](docs/INSTALL.md).
+Full steps (the first run, the file locations, update, uninstall) are in
+[docs/INSTALL.md](docs/INSTALL.md).
 
 ## Authentication
 
