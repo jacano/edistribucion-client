@@ -70,7 +70,10 @@ The tool asks the portal for one zip with the hourly curves (action
 `createZip`), waits for it, and reads it. Then it deletes the zip. The period
 (P1, P2, P3) comes from the 2.0TD calendar, not from a data call.
 
-The portal has no data before 2024-01-16.
+The first and the last date depend on the account. The tool finds them by
+itself. Do not promise a start date.
+
+See `docs/ASSUMPTIONS.md` for the full list of assumptions and limits.
 
 ## Rules for your answer
 
@@ -97,3 +100,4 @@ The portal has no data before 2024-01-16.
 - `docs/INSTALL.md`: how to install and run the tool.
 - `docs/AUTHENTICATION.md`: how to get the session.
 - `docs/TARIFF_2_0TD.md`: the 2.0TD periods and the period calculation.
+- `docs/ASSUMPTIONS.md`: what the tool assumes, and the limits.

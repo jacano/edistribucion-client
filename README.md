@@ -123,8 +123,12 @@ WARNING: there are estimated consumptions.
 The tool asks the portal for one zip with the hourly curves and reads it. Then
 it deletes the zip from the portal. This is much faster than one call per month.
 The period (P1, P2, P3) is worked out from the 2.0TD calendar. All the details
-are in [docs/TARIFF_2_0TD.md](docs/TARIFF_2_0TD.md). The portal has no data before
-2024-01-16.
+are in [docs/TARIFF_2_0TD.md](docs/TARIFF_2_0TD.md). The first and the last date
+depend on the account; the tool finds them by itself.
+
+The tool works for a 2.0TD supply in the Peninsula, Illes Balears or Canarias.
+Other tariffs, and Ceuta and Melilla, need more work. The full list of
+assumptions and limits is in [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md).
 
 ## Security
 
