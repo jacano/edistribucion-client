@@ -122,29 +122,6 @@ def tariff_period(day, hour):
 
 `day.weekday()` is 5 for a Saturday and 6 for a Sunday.
 
-## How the period was verified
-
-The portal sends the period of each hour in the data of the old method. The
-tool compared its own period with the period of the portal. The test used one
-real 2.0TD account (Sevilla).
-
-- The test compared 23,322 hours, the full history of that account.
-- The real/estimated flag: 0 differences.
-- The consumption in kWh: the same in every hour.
-- The period: the same in every hour, when the tool used the 9 fixed holidays.
-  Before that, the tool also marked Easter as off-peak, and the portal did not.
-
-The small result of the test:
-
-| Period | From the portal | From this calculation |
-| ------ | --------------- | --------------------- |
-| P1 | 1890.896 kWh | 1890.900 kWh |
-| P2 | 1704.069 kWh | 1704.064 kWh |
-| P3 | 2202.085 kWh | 2202.104 kWh |
-
-The two columns are almost the same. The small difference comes from the last
-days, which the portal did not have yet.
-
 ## Change of the hour (DST)
 
 - The change of the hour is on a Sunday. All the hours of a Sunday are P3.
