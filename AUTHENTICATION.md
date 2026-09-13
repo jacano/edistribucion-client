@@ -11,7 +11,8 @@ This command logs in with the portal login call. No browser.
 python edistribucion.py login-backend
 ```
 
-It asks for the NIF and the password. Then it writes `sesion.json`.
+It uses the stored credentials if `credenciales.json` exists. If not, it asks
+for the NIF and the password. Then it writes `sesion.json`.
 
 Add `--save` to store the credentials:
 
