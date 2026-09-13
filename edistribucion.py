@@ -1004,6 +1004,24 @@ def _print_report(result):
         if result["last_real"] and result["last_real"] < result["to"]:
             print("NOTE: the last readings are estimated. The last real day is %s."
                   % result["last_real"])
+        print()
+        print("ESTIMATED MAP (R real, E estimated, M mixed, . no data)")
+        months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        symbols = {}
+        for group in result["consumption_by_month"]:
+            year, month = group["key"].split("-")
+            if group["real_hours"] and group["estimated_hours"]:
+                symbols[(year, month)] = "M"
+            elif group["estimated_hours"]:
+                symbols[(year, month)] = "E"
+            else:
+                symbols[(year, month)] = "R"
+        print("%-6s" % "" + " ".join(month.center(3) for month in months))
+        for year in sorted({key[0] for key in symbols}):
+            cells = [symbols.get((year, "%02d" % number), ".").center(3)
+                     for number in range(1, 13)]
+            print(("%-6s" % year + " ".join(cells)).rstrip())
     else:
         print("No estimated data. All the data is real.")
 

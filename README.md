@@ -112,6 +112,12 @@ MAXIMUM PER YEAR
 ESTIMATED DATES
   2024-03-02..2024-04-03, ...
 NOTE: the last readings are estimated. The last real day is 2026-09-12.
+
+ESTIMATED MAP (R real, E estimated, M mixed, . no data)
+      Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec
+2024   R   R   M   M   M   E   M   M   R   R   R   R
+2025   M   R   R   R   R   R   M   E   E   M   M   M
+2026   M   E   M   M   M   M   M   R   M   .   .   .
 ```
 
 The tool asks the portal for one zip with the hourly curves and reads it. Then
