@@ -67,7 +67,8 @@ edistribucion report
 ```
 
 The report uses all the data available. You do not set a period. With several
-CUPS, it prints one report for each CUPS, one after another.
+CUPS, the tool first prints a summary table (one line per CUPS with its totals),
+then one full report for each CUPS under a banner `CUPS i of N`.
 
 Option:
 

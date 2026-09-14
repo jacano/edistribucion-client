@@ -48,7 +48,9 @@ edistribucion
 ```
 
 This is the full report. It uses all the data available. It gives one report
-for each CUPS of the account, one after another. It contains:
+for each CUPS of the account, one after another. With several CUPS, it first
+prints a summary table, and each report has a banner `CUPS i of N`. It
+contains:
 
 - the CUPS, the tariff, and the contracted power per period,
 - the period covered (the first and the last date),

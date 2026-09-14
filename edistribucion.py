@@ -1023,11 +1023,29 @@ def _print_kwh_table(title, key_label, rows):
               % (group["key"], real, estimated, real + estimated))
 
 
-def _print_report(result):
-    print("REPORT")
+def _print_summary(reports):
+    """Print one line per CUPS with the totals."""
+    print("CUPS SUMMARY")
+    print("  %-3s %-24s %-8s %11s %11s %11s"
+          % ("#", "CUPS", "Tariff", "Real kWh", "Est. kWh", "Total kWh"))
+    for index, result in enumerate(reports, start=1):
+        real = result["real_kwh"]
+        estimated = result["estimated_kwh"]
+        print("  %-3d %-24s %-8s %11.3f %11.3f %11.3f"
+              % (index, result["cups"], result["tariff"], real, estimated, real + estimated))
+    print("  %-3s %-24s %-8s %11.3f %11.3f %11.3f"
+          % ("-", "Total", "", sum(r["real_kwh"] for r in reports),
+             sum(r["estimated_kwh"] for r in reports),
+             sum(r["real_kwh"] + r["estimated_kwh"] for r in reports)))
+    print()
+
+
+def _print_report(result, titled=True):
     power = result["contracted_power_kw"]
     power_txt = ", ".join("%s %s kW" % (name, value) for name, value in sorted(power.items()))
-    print("CUPS:", result["cups"])
+    if titled:
+        print("REPORT")
+        print("CUPS:", result["cups"])
     print("Tariff:", result["tariff"])
     print("Contracted power:", power_txt or "-")
     print("Period:", result["from"], "->", result["to"])
@@ -1127,7 +1145,6 @@ def cmd_report(args):
     visibility = account["visibility_id"]
     names = sorted({item["cups"] for item in supplies if item["cups"]})
     reports = []
-    printed = 0
     for cups in names:
         group = [item for item in supplies if item["cups"] == cups]
         current = next((item for item in group if not item.get("end")), group[-1])
@@ -1199,18 +1216,25 @@ def cmd_report(args):
             "max_demand_by_month": monthly_power,
         }
         reports.append(result)
-        if not args.json:
-            if printed > 0:
-                print()
-                print("=" * 60)
-                print()
-            _print_report(result)
-            printed += 1
     if not reports:
         print("No data.", file=sys.stderr)
         sys.exit(1)
     if args.json:
         print(json.dumps(reports, ensure_ascii=False, indent=2))
+        return
+    many = len(reports) > 1
+    if many:
+        _print_summary(reports)
+    for index, result in enumerate(reports, start=1):
+        if many:
+            print("=" * 60)
+            print("  CUPS %d of %d   %s" % (index, len(reports), result["cups"]))
+            print("=" * 60)
+            _print_report(result, titled=False)
+            if index < len(reports):
+                print()
+        else:
+            _print_report(result)
 
 
 def build_parser():
