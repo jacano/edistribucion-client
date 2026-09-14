@@ -20,11 +20,13 @@ differ. Read this list before you trust a number.
 - Ceuta and Melilla have other hours, so the period split can be wrong for a
   supply there.
 
-## 3. Windows, for the saved password
+## 3. The credential store, for the saved password
 
-- `login-backend --save` encrypts the password with the Windows DPAPI.
-- That part works on Windows only. On Linux and macOS the tool runs, but
-  `--save` does not work. Get the session another way.
+- `login-backend --save` keeps the password in the credential store of the
+  system: DPAPI on Windows, Keychain on macOS, libsecret on Linux.
+- On Linux the tool needs the `secret-tool` tool (the `libsecret-tools`
+  package). When it is not there, `--save` stops with a message. Get the
+  session another way, or install the package.
 
 ## 4. Real or estimated
 

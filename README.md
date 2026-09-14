@@ -47,8 +47,9 @@ Get the session with one of these commands. Full steps are in
 [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md).
 
 - `login-backend` logs in with the user and the password. No browser. Add
-  `--save` to store the credentials encrypted with the Windows DPAPI. Then the
-  tool logs in again when the session expires.
+  `--save` to keep the password in the credential store of the system (DPAPI on
+  Windows, Keychain on macOS, libsecret on Linux). Then the tool logs in again
+  when the session expires.
 - `import-cookies` reads a `cookies.txt` file.
 - `save --sid` stores a value that you already have.
 

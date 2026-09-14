@@ -35,6 +35,8 @@ import io
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import time
 import urllib.error
@@ -204,19 +206,77 @@ def dpapi_unprotect(data):
         ctypes.windll.kernel32.LocalFree(out_blob.pbData)
 
 
+CREDENTIAL_SERVICE = "edistribucion-client"
+
+
+def credential_backend():
+    """Return the credential store of this system, or None.
+
+    Windows uses the Data Protection API (DPAPI). macOS uses the Keychain via
+    the `security` tool. Linux uses libsecret via the `secret-tool` tool.
+    """
+    if sys.platform == "win32":
+        return "dpapi"
+    if sys.platform == "darwin":
+        return "keychain" if shutil.which("security") else None
+    return "secret-tool" if shutil.which("secret-tool") else None
+
+
+def _keychain_store(username, password):
+    subprocess.run(["security", "add-generic-password", "-a", username, "-s",
+                    CREDENTIAL_SERVICE, "-w", password, "-U"], check=True)
+
+
+def _keychain_load(username):
+    result = subprocess.run(["security", "find-generic-password", "-a", username,
+                             "-s", CREDENTIAL_SERVICE, "-w"],
+                            check=True, capture_output=True, text=True)
+    return result.stdout.strip()
+
+
+def _secret_tool_store(username, password):
+    subprocess.run(["secret-tool", "store", "--label", CREDENTIAL_SERVICE,
+                    "service", CREDENTIAL_SERVICE, "username", username],
+                   input=password, text=True, check=True)
+
+
+def _secret_tool_load(username):
+    result = subprocess.run(["secret-tool", "lookup", "service", CREDENTIAL_SERVICE,
+                             "username", username], check=True, capture_output=True, text=True)
+    return result.stdout.strip()
+
+
 def save_credentials(username, password, path=DEFAULT_CREDENTIALS):
-    blob = base64.b64encode(dpapi_protect(password.encode("utf-8"))).decode("ascii")
+    system = credential_backend()
+    if system is None:
+        raise RuntimeError("--save needs a credential store. On Linux install "
+                           "libsecret-tools (the secret-tool tool).")
+    record = {"system": system, "username": username}
+    if system == "dpapi":
+        record["password"] = base64.b64encode(
+            dpapi_protect(password.encode("utf-8"))).decode("ascii")
+    elif system == "keychain":
+        _keychain_store(username, password)
+    else:
+        _secret_tool_store(username, password)
     with open(path, "w", encoding="utf-8") as fh:
-        json.dump({"system": "dpapi", "username": username, "password": blob}, fh, indent=2)
+        json.dump(record, fh, indent=2)
     return path
 
 
 def load_credentials(path=DEFAULT_CREDENTIALS):
     data = json.load(open(path, encoding="utf-8"))
-    if data.get("system") != "dpapi":
-        raise RuntimeError("Unknown credential storage: %s" % data.get("system"))
-    password = dpapi_unprotect(base64.b64decode(data["password"])).decode("utf-8")
-    return data.get("username"), password
+    system = data.get("system")
+    username = data.get("username")
+    if system == "dpapi":
+        password = dpapi_unprotect(base64.b64decode(data["password"])).decode("utf-8")
+    elif system == "keychain":
+        password = _keychain_load(username)
+    elif system == "secret-tool":
+        password = _secret_tool_load(username)
+    else:
+        raise RuntimeError("Unknown credential storage: %s" % system)
+    return username, password
 
 
 # ---------------------------------------------------------------- backend login
@@ -714,7 +774,7 @@ def cmd_login_backend(args):
     print("Session saved to", args.session)
     if args.save:
         path = save_credentials(username, password, args.credentials)
-        print("Credentials saved (encrypted with Windows DPAPI) to", path)
+        print("Credentials saved with %s to %s" % (credential_backend(), path))
     try:
         account = Client(session).whoami()
         print("Login OK. User:", account["name"])
@@ -1181,7 +1241,7 @@ def build_parser():
     backend.add_argument("--user", help="NIF, passport or NIE")
     backend.add_argument("--password", help="the password (or you are asked for it)")
     backend.add_argument("--save", action="store_true",
-                         help="store the credentials encrypted with Windows DPAPI")
+                         help="store the credentials in the credential store of the system")
     backend.add_argument("--credentials", default=DEFAULT_CREDENTIALS,
                          help="path to the credentials file")
     backend.set_defaults(func=cmd_login_backend)

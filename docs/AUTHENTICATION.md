@@ -28,9 +28,15 @@ Add `--save` to store the credentials:
 python edistribucion.py login-backend --save
 ```
 
-The credentials go to `credentials.json`. The password is encrypted with the
-Windows Data Protection API (DPAPI). Only your Windows user can decrypt it. The
-file holds no clear password.
+The credentials go to `credentials.json`. The password is kept in the
+credential store of the system:
+
+- Windows: the Data Protection API (DPAPI). The file holds the encrypted value.
+- macOS: the Keychain, with the `security` tool. The file holds the username.
+- Linux: libsecret, with the `secret-tool` tool. The file holds the username.
+
+Only your user can read the password. The file holds no clear password. On
+Linux, install `libsecret-tools` (the `secret-tool` tool) to use `--save`.
 
 Auto login: when `credentials.json` exists, any command that finds the session
 expired logs in again with the stored credentials. You see this line:

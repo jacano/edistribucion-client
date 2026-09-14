@@ -21,8 +21,9 @@ edistribucion login-backend --save
 ```
 
 It asks for your NIF and your password, and writes `session.json`. The `--save`
-also stores the password, encrypted with the Windows DPAPI, in
-`credentials.json`. See [AUTHENTICATION.md](AUTHENTICATION.md).
+also keeps the password in the credential store of the system (DPAPI on
+Windows, Keychain on macOS, libsecret on Linux). See
+[AUTHENTICATION.md](AUTHENTICATION.md).
 
 ## File locations
 
