@@ -1079,6 +1079,8 @@ def _print_report(result):
     _print_kwh_table("  By hour of day", "Hour", result["consumption_by_hour"])
     print()
     print("MAXIMUM PER YEAR")
+    print("  Peak hour: the most energy in one hour (kWh). Peak demand: the top")
+    print("  15 minute power (kW), from the portal. They can be on other days.")
     print("  %-4s  %10s  %-20s  %11s  %s"
           % ("Year", "Peak hour", "When", "Peak demand", "When"))
     hourly = result["max_hourly_by_year"]

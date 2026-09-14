@@ -107,6 +107,8 @@ CONSUMPTION
     ...
 
 MAXIMUM PER YEAR
+  Peak hour: the most energy in one hour (kWh). Peak demand: the top
+  15 minute power (kW), from the portal. They can be on other days.
   Year   Peak hour  When                  Peak demand  When
   2024   3.330 kWh  15/12/2024 10 - 11 h     4.760 kW  28/10/2024 22:15
   2025   3.625 kWh  02/02/2025 21 - 22 h     5.024 kW  20/02/2025 21:45
