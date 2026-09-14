@@ -37,7 +37,7 @@ This file tells an LLM agent what this tool is and how to use it.
 | `edistribucion report` | the same as `edistribucion` |
 | `edistribucion login-backend` | log in with user and password, no browser |
 | `edistribucion import-cookies` | import a cookies.txt |
-| `edistribucion save --sid` | store a session value by hand |
+| `edistribucion set-session --sid` | store a session value by hand |
 
 The options `--sid` and `--session` go before or after the command.
 

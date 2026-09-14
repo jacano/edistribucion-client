@@ -52,7 +52,7 @@ Get the session with one of these commands. Full steps are in
   Windows, Keychain on macOS, libsecret on Linux). Then the tool logs in again
   when the session expires.
 - `import-cookies` reads a `cookies.txt` file.
-- `save --sid` stores a value that you already have.
+- `set-session --sid` stores a session value that you already have.
 
 ```bash
 edistribucion login-backend --save      # installed tool

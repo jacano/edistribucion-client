@@ -22,7 +22,7 @@ How it works (Salesforce Experience Cloud / Aura):
 Session: session.json (or the EDIST_SID environment variable). Commands:
   python edistribucion.py login-backend [--save] # log in with user and password
   python edistribucion.py import-cookies [FILE]  # import a cookies.txt
-  python edistribucion.py save --sid "<value>"   # save a value by hand
+  python edistribucion.py set-session --sid "<value>" # store a session by hand
   python edistribucion.py report [--json]        # full report for every CUPS
 """
 import argparse
@@ -685,7 +685,7 @@ def load_context(args):
 
 
 # ---------------------------------------------------------------- commands
-def cmd_save(args):
+def cmd_set_session(args):
     session = Session(sid=args.sid, path=args.session)
     if args.text:
         session.cookies.update(extract_cookies_from_text(args.text))
@@ -1218,10 +1218,12 @@ def build_parser():
     common.add_argument("--sid", default=argparse.SUPPRESS)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    save = sub.add_parser("save", parents=[common], help="store the session cookie")
-    save.add_argument("--cookie", help="extra cookies: 'k=v; k2=v2'")
-    save.add_argument("--text", help="a Cookie header or a cURL line that holds the session")
-    save.set_defaults(func=cmd_save)
+    session_cmd = sub.add_parser("set-session", parents=[common],
+                                 help="store a session value that you already have")
+    session_cmd.add_argument("--cookie", help="extra cookies: 'k=v; k2=v2'")
+    session_cmd.add_argument("--text",
+                             help="a Cookie header or a cURL line that holds the session")
+    session_cmd.set_defaults(func=cmd_set_session)
 
     imp = sub.add_parser("import-cookies", parents=[common],
                          help="import cookies from a cookies.txt (Netscape) or JSON file")

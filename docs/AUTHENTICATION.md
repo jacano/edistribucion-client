@@ -72,20 +72,20 @@ python edistribucion.py import-cookies cookies.txt
 Export the file right before the import. Each new login can end the previous
 session, so an old file may hold a dead session.
 
-## `save`
+## `set-session`
 
-This command stores a value that you already have. It is used by an agent or by
-hand. You can read the value from the `Cookie` header of a portal request, or
-from the browser cookie panel.
+This command stores a session value that you already have. It is used by an
+agent or by hand. You can read the value from the `Cookie` header of a portal
+request, or from the browser cookie panel.
 
 ```bash
-python edistribucion.py save --sid "<sid value>"
+python edistribucion.py set-session --sid "<sid value>"
 ```
 
 `--text` accepts a whole `Cookie` header, or a cURL line:
 
 ```bash
-python edistribucion.py save --text "renderCtx=x; sid=00D...!AQEA...; oid=00D"
+python edistribucion.py set-session --text "renderCtx=x; sid=00D...!AQEA...; oid=00D"
 ```
 
 ## Notes
