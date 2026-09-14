@@ -26,7 +26,7 @@ This file tells an LLM agent what this tool is and how to use it.
 - The tool needs the session file `session.json`. The tool looks for it in the
   folder of the file, the current folder, and the user config folder.
 - If the report fails with an authentication error, the session expired. Tell
-  the user to run `edistribucion login-backend`, or let the auto login do it.
+  the user to run `edistribucion login`, or let the auto login do it.
   See `docs/AUTHENTICATION.md`.
 
 ## Commands
@@ -35,7 +35,7 @@ This file tells an LLM agent what this tool is and how to use it.
 | --------- | ------------ |
 | `edistribucion` | full report for every CUPS, all data |
 | `edistribucion report` | the same as `edistribucion` |
-| `edistribucion login-backend` | log in with user and password, no browser |
+| `edistribucion login` | log in with user and password, no browser |
 | `edistribucion import-cookies` | import a cookies.txt |
 | `edistribucion set-session --sid` | store a session value by hand |
 
@@ -93,7 +93,7 @@ See `docs/ASSUMPTIONS.md` for the full list of assumptions and limits.
 
 | message | what to do |
 | ------- | ---------- |
-| `Could not obtain aura.token (expired session?)` | the session expired. Tell the user to run `login-backend`. |
+| `Could not obtain aura.token (expired session?)` | the session expired. Tell the user to run `login`. |
 | `Aura error ...` | the portal returned an error. Show the message. |
 | `No sid found in the text.` | the text had no session. Ask for the value again. |
 

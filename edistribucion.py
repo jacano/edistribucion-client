@@ -20,10 +20,10 @@ How it works (Salesforce Experience Cloud / Aura):
     2.0TD calendar.
 
 Session: session.json (or the EDIST_SID environment variable). Commands:
-  python edistribucion.py login-backend [--save] # log in with user and password
-  python edistribucion.py import-cookies [FILE]  # import a cookies.txt
-  python edistribucion.py set-session --sid "<value>" # store a session by hand
-  python edistribucion.py report [--json]        # full report for every CUPS
+  python edistribucion.py login [--save]        # log in with user and password
+  python edistribucion.py import-cookies [FILE] # import a cookies.txt
+  python edistribucion.py set-session --sid "X" # store a session by hand
+  python edistribucion.py report [--json]       # full report for every CUPS
 """
 import argparse
 import base64
@@ -300,7 +300,7 @@ def login_context():
                        "dn": [], "globals": {}, "uad": True}, separators=(",", ":"))
 
 
-def backend_login(username, password, start_url=""):
+def portal_login(username, password, start_url=""):
     """Log in with the portal login call. Return (sid, raw_response).
 
     The login page is a guest page. Its requests use `aura.token=null`.
@@ -655,7 +655,7 @@ def auto_login(args):
     if not os.path.exists(DEFAULT_CREDENTIALS):
         return None
     username, password = load_credentials(DEFAULT_CREDENTIALS)
-    sid, _ = backend_login(username, password)
+    sid, _ = portal_login(username, password)
     if not sid:
         return None
     session = Session(sid=sid, path=args.session)
@@ -745,7 +745,7 @@ def extract_cookies_from_text(text):
     return found
 
 
-def cmd_login_backend(args):
+def cmd_login(args):
     username = args.user
     password = args.password
     if not (username and password) and os.path.exists(args.credentials):
@@ -760,7 +760,7 @@ def cmd_login_backend(args):
 
     print("Logging in by backend...")
     try:
-        sid, text = backend_login(username, password)
+        sid, text = portal_login(username, password)
     except Exception as exc:
         print("Login request failed:", exc, file=sys.stderr)
         sys.exit(1)
@@ -1230,15 +1230,15 @@ def build_parser():
     imp.add_argument("file", nargs="?", help="path to cookies.txt or JSON export (default: newest in Downloads)")
     imp.set_defaults(func=cmd_import_cookies)
 
-    backend = sub.add_parser("login-backend", parents=[common],
-                             help="log in with user and password, no browser")
-    backend.add_argument("--user", help="NIF, passport or NIE")
-    backend.add_argument("--password", help="the password (or you are asked for it)")
-    backend.add_argument("--save", action="store_true",
-                         help="store the credentials in the credential store of the system")
-    backend.add_argument("--credentials", default=DEFAULT_CREDENTIALS,
-                         help="path to the credentials file")
-    backend.set_defaults(func=cmd_login_backend)
+    login_cmd = sub.add_parser("login", parents=[common],
+                               help="log in with user and password, no browser")
+    login_cmd.add_argument("--user", help="NIF, passport or NIE")
+    login_cmd.add_argument("--password", help="the password (or you are asked for it)")
+    login_cmd.add_argument("--save", action="store_true",
+                           help="store the credentials in the credential store of the system")
+    login_cmd.add_argument("--credentials", default=DEFAULT_CREDENTIALS,
+                           help="path to the credentials file")
+    login_cmd.set_defaults(func=cmd_login)
 
     report = sub.add_parser("report", parents=[common],
                             help="full report for every CUPS (all data available)")

@@ -17,7 +17,7 @@ The install gives the command `edistribucion`.
 ## First run (the session)
 
 ```bash
-edistribucion login-backend --save
+edistribucion login --save
 ```
 
 It asks for your NIF and your password, and writes `session.json`. The `--save`

@@ -47,16 +47,17 @@ Full steps (the first run, the file locations, update, uninstall) are in
 Get the session with one of these commands. Full steps are in
 [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md).
 
-- `login-backend` logs in with the user and the password. No browser. Add
+- `login` logs in with the user and the password. No browser. Add
   `--save` to keep the password in the credential store of the system (DPAPI on
   Windows, Keychain on macOS, libsecret on Linux). Then the tool logs in again
   when the session expires.
-- `import-cookies` reads a `cookies.txt` file.
+- `import-cookies` reads a `cookies.txt` file. Use the browser extension "Get
+  cookies.txt LOCALLY" (Chrome and Firefox); the links are in the guide.
 - `set-session --sid` stores a session value that you already have.
 
 ```bash
-edistribucion login-backend --save      # installed tool
-python edistribucion.py login-backend   # file, without installing
+edistribucion login --save      # installed tool
+python edistribucion.py login   # file, without installing
 ```
 
 ## Report
