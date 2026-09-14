@@ -1,83 +1,30 @@
 # Assumptions and limits
 
-This file lists what the tool assumes. The tool was built and tested with one
-real account. Some facts come from that account only. Other accounts can
-differ. Read this list before you trust a number.
+This file lists what can differ when you use the tool with another account. The
+tool was built and tested with one real 2.0TD account.
 
-## 1. The tariff is 2.0TD (P1, P2, P3)
+## Scope
 
-- The report shows the tariff of the supply.
-- The tool puts every hour into three periods only (P1, P2, P3).
-- When the tariff is not `2.0TD`, the tool stops with an error and gives no
-  report data.
-- A `3.0TD` or `6.xTD` supply has six periods (P1 to P6) and another table of
-  hours. The tool does not handle it.
+- The tool supports the 2.0TD tariff only, with three periods (P1, P2, P3).
+- A supply with another tariff (3.0TD, 6.xTD) stops with an error and gives no
+  report.
 
-## 2. The supply is in the Peninsula (or Illes Balears or Canarias)
+## Zone
 
-- The tool uses the hours P1 10-14 and 18-22, P2 08-10, 14-18 and 22-24, P3
-  00-08.
-- Ceuta and Melilla have other hours, so the period split can be wrong for a
-  supply there.
+- The period hours are the ones of the Peninsula, Illes Balears and Canarias.
+- Ceuta and Melilla use other hours, so the period split can be wrong there.
 
-## 3. The credential store, for the saved password
+## Environment
 
-- `login-backend --save` keeps the password in the credential store of the
-  system: DPAPI on Windows, Keychain on macOS, libsecret on Linux.
-- On Linux the tool needs the `secret-tool` tool (the `libsecret-tools`
-  package). When it is not there, `--save` stops with a message. Get the
-  session another way, or install the package.
+- Python 3.9 or newer. The tool uses the standard library only.
+- `--save` keeps the password in the credential store of the system: DPAPI on
+  Windows, Keychain on macOS, libsecret on Linux.
+- On Linux, `--save` needs the `secret-tool` tool (the `libsecret-tools`
+  package).
 
-## 4. Real or estimated
+## Reliability
 
-- The tool reads the `REAL/ESTIMADO` column of the CSV.
-- A value that starts with `R` is real. Every other value is estimated.
-- In the test account the values are `R` and `E` only.
-- The last one or two days come as estimated with 0 kWh, because the portal has
-  no reading for them yet. The tool marks these days as `pending`, not as
-  estimated consumption.
-- The portal publishes the real reading of a day with a small delay. In the
-  test account the last real day was two days before today.
-
-## 5. The zip from the portal
-
-- The tool gets the hourly history from the massive download, as one zip. It
-  does not use the per-range API `WP_Measure_v3_CTRL.getChartPointsByRange`.
-- That per-range API gives the hourly curve, but only for a short range (about
-  35 days in the test account). The full history needs one call for each range
-  (33 calls in the test account). That does not scale.
-- Both methods give the same result. In the test the real total and the split
-  by P1, P2 and P3 were the same, with a difference of about 0.01 kWh. That
-  difference is the rounding of the CSV (3 decimals).
-- The tool asks for the hourly zip (`downloadType=1`). The portal also has a
-  quarter-hourly zip.
-- The tool waits up to 180 seconds for the zip. The portal makes the zip in the
-  background. A large account can need more time.
-- The tool reads files whose name ends in `_Horario.csv`, and skips the
-  `_CCH_CONS.csv` files. If the portal changes the names, the read stops.
-- The tool deletes the zip after the read. If the delete fails, the file stays
-  in the portal.
-
-## 6. The period calculation
-
-- The tool marks a national holiday with a fixed date as off-peak (P3). The
-  list has 9 dates. See [TARIFF_2_0TD.md](TARIFF_2_0TD.md).
-- The tool assumes the change of the hour is on a Sunday and in the early
-  morning, so the period of an hour does not change. This is true in Spain.
-- The `Hora` column of the CSV is the position in the day. A day of the change
-  of the hour has 23 or 25 rows, not 24.
-
-## 7. The portal itself
-
-- The action names, the Aura `fwuid`, and the app version are fixed values in
-  the code. They came from the portal at one time. The portal can change them.
-- The tool reads the token from the `Set-Cookie` header `__Host-ERIC...`. The
-  portal can change the name.
-- The tool reads the contracted power from the ATR detail page, from the name
-  `Potencia contratada`.
-
-## What to do when an assumption is false
-
-- The tool stops, or a number is wrong.
-- Check the tariff first. A supply that is not 2.0TD needs the six-period
-  table.
+- The tool depends on the portal. The portal can change the action names, the
+  app version, the cookie names or the file format. Then the tool can stop.
+- The portal makes the zip in the background. A large account can need more
+  than the 3 minute wait.

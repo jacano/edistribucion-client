@@ -1009,7 +1009,7 @@ def recent_ranges(day_counts, last_day, days=90):
     return ranges
 
 
-def _print_kwh_table(title, key_label, rows, total):
+def _print_kwh_table(title, key_label, rows):
     """Print a table with a real column, an estimated column and a total."""
     print(title)
     print("    %-8s %11s %11s %11s" % (key_label, "real kWh", "est. kWh", "total kWh"))
@@ -1018,9 +1018,6 @@ def _print_kwh_table(title, key_label, rows, total):
         estimated = group["estimated_kwh"]
         print("    %-8s %11.3f %11.3f %11.3f"
               % (group["key"], real, estimated, real + estimated))
-    real, estimated = total
-    print("    %-8s %11.3f %11.3f %11.3f"
-          % ("Total", real, estimated, real + estimated))
 
 
 def _print_report(result):
@@ -1062,13 +1059,6 @@ def _print_report(result):
               % (group["key"], real, estimated, real + estimated,
                  "%d h (%d d)" % (real_h, round(real_h / 24.0)),
                  "%d h (%d d)" % (estimated_h, round(estimated_h / 24.0))))
-    real_h = result["real_hours"]
-    estimated_h = result["estimated_hours"]
-    print("    %-7s %11.3f %11.3f %11.3f   %14s %14s"
-          % ("Total", result["real_kwh"], result["estimated_kwh"],
-             result["real_kwh"] + result["estimated_kwh"],
-             "%d h (%d d)" % (real_h, round(real_h / 24.0)),
-             "%d h (%d d)" % (estimated_h, round(estimated_h / 24.0))))
 
     print("  By year period")
     header = "    %-7s" % "Year"
@@ -1081,16 +1071,9 @@ def _print_report(result):
             slot = periods.get(name, {})
             line += "  %10.3f %10.3f" % (slot.get("real", 0.0), slot.get("estimated", 0.0))
         print(line)
-    line = "    %-7s" % "Total"
-    for name in names:
-        line += "  %10.3f %10.3f" % (result["periods_real_kwh"].get(name, 0.0),
-                                     result["periods_estimated_kwh"].get(name, 0.0))
-    print(line)
 
-    _print_kwh_table("  By month", "Month", result["consumption_by_month"],
-                     (result["real_kwh"], result["estimated_kwh"]))
-    _print_kwh_table("  By hour of day", "Hour", result["consumption_by_hour"],
-                     (result["real_kwh"], result["estimated_kwh"]))
+    _print_kwh_table("  By month", "Month", result["consumption_by_month"])
+    _print_kwh_table("  By hour of day", "Hour", result["consumption_by_hour"])
     print()
     print("MAXIMUM PER YEAR")
     print("  %-4s  %10s  %-20s  %11s  %s"
