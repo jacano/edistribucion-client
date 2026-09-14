@@ -9,12 +9,14 @@ description = "HTTP-only client to read your e-distribucion electricity consumpt
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
-authors = [{ name = "jacano" }]
+authors = [{ name = "Juan Antonio Cano Salado" }]
 keywords = ["edistribucion", "endesa", "electricity", "consumption"]
 classifiers = [
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
+  "Topic :: Utilities",
 ]
 
 [project.urls]

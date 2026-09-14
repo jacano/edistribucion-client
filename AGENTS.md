@@ -51,12 +51,12 @@ This is the full report. It uses all the data available. It gives one report
 for each CUPS of the account, one after another. It contains:
 
 - the CUPS, the tariff, and the contracted power per period,
-- the real period used,
+- the period covered (the first and the last date),
 - the real and estimated totals and the split by `P1`, `P2`, `P3`,
 - the consumption by year (with the P1, P2, P3 split), month, and hour, with
   real and estimated values,
 - the maximum consumption in one hour per year,
-- the maximum demanded power per year and per month,
+- the maximum demanded power per year (the full list per month is in the JSON),
 - a zoom of the last 3 months (the last reading and its delay, and the real,
   estimated and pending ranges), and a monthly reading map (R real,
   E estimated, M mixed, . no data; pending days do not count).
@@ -84,7 +84,7 @@ See `docs/ASSUMPTIONS.md` for the full list of assumptions and limits.
 
 - Report the real and the estimated values separately.
 - Always report the split by P1, P2, P3.
-- Report the dates for the estimated data.
+- Report the last reading and the recent zoom (real, estimated and pending).
 - Report the contracted power and the peak demand.
 - Do not print the session cookie or the file `session.json`.
 - This tool reads data only. Do not try to change data on the portal.

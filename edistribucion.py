@@ -1018,9 +1018,11 @@ def _print_kwh_table(title, key_label, rows, total):
 
 def _print_report(result):
     print("REPORT")
+    power = result["contracted_power_kw"]
+    power_txt = ", ".join("%s %s kW" % (name, value) for name, value in sorted(power.items()))
     print("CUPS:", result["cups"])
     print("Tariff:", result["tariff"])
-    print("Contracted power:", result["contracted_power_kw"], "kW")
+    print("Contracted power:", power_txt or "-")
     print("Period:", result["from"], "->", result["to"])
     print()
     print("CONSUMPTION")

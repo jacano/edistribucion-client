@@ -13,8 +13,9 @@ and covers every CUPS of the account, one after another. Each report contains:
 - the real and estimated consumption by year (with the P1, P2, P3 split),
   month, and hour,
 - the maximum consumption in one hour per year,
-- the maximum demanded power per year and per month,
-- a warning when estimated data exists, with the dates.
+- the maximum demanded power per year (the full list per month is in the JSON),
+- a zoom of the last 3 months (the last reading and its delay) and a monthly
+  reading map, so you see what is real, estimated or pending.
 
 Warning: this tool is not official. It is not connected to e-distribucion or
 Endesa. Use it only with your own account. The portal can change at any time.
@@ -64,9 +65,8 @@ python edistribucion.py login-backend   # file, without installing
 edistribucion report
 ```
 
-The report uses all the data available. You do not set a period. The tool finds
-the first and the last date by itself. With several CUPS, it prints one report
-for each CUPS, one after another.
+The report uses all the data available. You do not set a period. With several
+CUPS, it prints one report for each CUPS, one after another.
 
 Option:
 
@@ -76,9 +76,9 @@ Example output:
 
 ```
 REPORT
-CUPS: ES0031102226226018WR0F
+CUPS: ES0031100000000000NN0N
 Tariff: 2.0TD
-Contracted power: {'P1': 4.0, 'P2': 4.0} kW
+Contracted power: P1 4.0 kW, P2 4.0 kW
 Period: 2024-01-16 -> 2026-09-14
 
 CONSUMPTION
@@ -145,8 +145,9 @@ in [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md).
 ## Security
 
 The file `session.json` holds your live session cookie. The file
-`credentials.json` holds the encrypted password. The `.gitignore` file excludes
-both. Do not commit them. Do not share them.
+`credentials.json` holds your saved credentials: the username, and on Windows
+the encrypted password. The `.gitignore` file excludes both. Do not commit
+them. Do not share them.
 
 The tool reads data from your own account only.
 
