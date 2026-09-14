@@ -90,17 +90,54 @@ cookies.txt LOCALLY** exports that format. It is open source.
 ## `set-session`
 
 This command stores a session value that you already have. It is used by an
-agent or by hand. You can read the value from the `Cookie` header of a portal
-request, or from the browser cookie panel.
+agent or by hand.
+
+### The `--sid` value
+
+`--sid` takes the value of the `sid` cookie, not the name `sid=`. Use the exact
+value, with no spaces.
 
 ```bash
-python edistribucion.py set-session --sid "<sid value>"
+python edistribucion.py set-session --sid "00D000000000ABC!AQEAQ...long text...9XyZ"
 ```
 
-`--text` accepts a whole `Cookie` header, or a cURL line:
+The value has two parts, joined by `!`:
+
+1. a short id (15 characters). It is always the same for your account.
+2. a long text with dots.
+
+The quotes in the example are for the shell. Do not put quotes in the value.
+A leading `sid=` is also accepted, so both forms work.
+
+To get the value:
+
+1. Log in to the portal in the browser.
+2. Open the developer tools (F12) and the **Network** tab.
+3. Open a request to `zonaprivada.edistribucion.com`.
+4. In **Request Headers**, find the `Cookie` header.
+5. Copy the text after `sid=` (up to the next `;`).
+
+The browser cookie panel also shows the `sid` cookie for the portal domain.
+
+### The `--text` value
+
+`--text` takes a whole `Cookie` header, or a cURL line that holds one. The tool
+keeps the cookies of the portal only.
 
 ```bash
-python edistribucion.py set-session --text "renderCtx=x; sid=00D...!AQEA...; oid=00D"
+python edistribucion.py set-session --text "sid=00D000000000ABC!AQEAQ...; oid=00D...; sid_Client=o00000...; inst=APP_cj"
+```
+
+The tool reads these names: `sid`, `oid`, `sid_Client`, `inst` and `clientSrc`.
+Only `sid` is required. Each pair is `name=value`, and the pairs are joined by
+`;`.
+
+### The `--cookie` value
+
+`--cookie` adds more cookies, as `name=value` pairs joined by `;`:
+
+```bash
+python edistribucion.py set-session --sid "00D...!..." --cookie "autocomplete=0; _gid=GA1.2..."
 ```
 
 ## Notes

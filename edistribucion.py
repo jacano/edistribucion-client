@@ -686,7 +686,10 @@ def load_context(args):
 
 # ---------------------------------------------------------------- commands
 def cmd_set_session(args):
-    session = Session(sid=args.sid, path=args.session)
+    sid = (args.sid or "").strip().strip("\"'")
+    if sid.startswith("sid="):
+        sid = sid[4:].strip()
+    session = Session(sid=sid or None, path=args.session)
     if args.text:
         session.cookies.update(extract_cookies_from_text(args.text))
     if args.cookie:
