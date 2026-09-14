@@ -79,18 +79,18 @@ REPORT
 CUPS: ES0031100000000000NN0N
 Tariff: 2.0TD
 Contracted power: P1 4.0 kW, P2 4.0 kW
-Period: 2024-01-16 -> 2026-09-14
+Period: 2024-01-16 -> 2026-09-12
 
 CONSUMPTION
   Consumption        kWh            hours         P1         P2         P3
   Real          5797.068  15911 h (663 d)   1890.900   1704.064   2202.104
-  Estimated     2742.983   7438 h (310 d)    810.040    657.056   1275.887
-  Total         8540.051  23349 h (973 d)   2700.940   2361.120   3477.991
+  Estimated     2742.983   7390 h (308 d)    810.040    657.056   1275.887
+  Total         8540.051  23301 h (971 d)   2700.940   2361.120   3477.991
   By year
     Year       real kWh    est. kWh   total kWh       real hours     est. hours
     2024       2007.797     595.522    2603.319   6265 h (261 d)  2158 h (90 d)
     2025       2613.067     912.146    3525.213   5837 h (243 d) 2922 h (122 d)
-    Total      5797.068    2742.983    8540.051   15911 h (663 d) 7438 h (310 d)
+    Total      5797.068    2742.983    8540.051   15911 h (663 d) 7390 h (308 d)
   By year period
     Year        P1 real     P1 est     P2 real     P2 est     P3 real     P3 est
     2024        606.608    165.083     596.359    182.676     804.830    247.763

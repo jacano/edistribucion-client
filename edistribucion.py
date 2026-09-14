@@ -861,7 +861,17 @@ def collect_consumption(client, account, contracts, listing):
                 hours[key] = (kwh, real)
     log("Read %d hours from the zip." % len(hours))
 
+    # The status of each day, for the recent zoom. This keeps the pending days.
+    for (day, _hour), (kwh, real) in hours.items():
+        counts = day_counts.setdefault(day, {"real": 0, "estimated": 0, "kwh": 0.0})
+        counts["kwh"] += kwh
+        counts["real" if real else "estimated"] += 1
+    pending_days = {day for day, value in day_counts.items()
+                    if value["kwh"] == 0 and value["estimated"] and not value["real"]}
+
     for (day, hour), (kwh, real) in sorted(hours.items()):
+        if day in pending_days:
+            continue
         hour_key = "%02d" % hour
         period = tariff_period(day, hour)
         for group, gkey in (("year", "%04d" % day.year),
@@ -880,9 +890,6 @@ def collect_consumption(client, account, contracts, listing):
         target = periods_real if real else periods_estimated
         if period in target:
             target[period] += kwh
-        counts = day_counts.setdefault(day, {"real": 0, "estimated": 0, "kwh": 0.0})
-        counts["kwh"] += kwh
-        counts["real" if real else "estimated"] += 1
         label = "%02d - %02d h" % (hour, hour + 1)
         if real:
             total_real += kwh
@@ -1159,21 +1166,21 @@ def cmd_report(args):
             if year not in year_power or info["kw"] > year_power[year]["kw"]:
                 year_power[year] = info
         counts = data["day_counts"]
-        last_day = data["to"]
+        window_end = max(counts) if counts else data["to"]
         today = date.today()
         last_value = max((day for day, value in counts.items() if value["kwh"] > 0),
                          default=None)
-        ranges = recent_ranges(counts, last_day)
+        ranges = recent_ranges(counts, window_end)
         result = {
             "cups": cups,
             "tariff": tariff,
             "contracted_power_kw": contracted,
             "from": data["from"].isoformat(),
-            "to": last_day.isoformat(),
+            "to": data["to"].isoformat(),
             "last_real": data["last_real"].isoformat() if data["last_real"] else None,
             "recent": {
                 "today": today.isoformat(),
-                "to": last_day.isoformat(),
+                "to": window_end.isoformat(),
                 "last_reading": last_value.isoformat() if last_value else None,
                 "last_status": day_status(counts.get(last_value)) if last_value else None,
                 "delay_days": (today - last_value).days if last_value else None,
