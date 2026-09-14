@@ -119,11 +119,11 @@ RECENT (last 3 months)
     2026-07-25..2026-09-12   real
     2026-09-13..2026-09-14   pending (no reading yet)
 
-ESTIMATED MAP (R real, E estimated, M mixed, . no data)
+READING MAP (R real, E estimated, M mixed, . no data)
       Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec
 2024   R   R   M   M   M   E   M   M   R   R   R   R
 2025   M   R   R   R   R   R   M   E   E   M   M   M
-2026   M   E   M   M   M   M   M   R   M   .   .   .
+2026   M   E   M   M   M   M   M   R   R   .   .   .
 ```
 
 The tool asks the portal for one zip with the hourly curves and reads it. Then

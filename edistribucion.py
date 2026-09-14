@@ -902,6 +902,22 @@ def day_status(counts):
     return "R"
 
 
+def month_map(day_counts):
+    """Return year -> 12 symbols (R, E, M or .). Pending days are ignored."""
+    years = {}
+    for day, counts in day_counts.items():
+        status = day_status(counts)
+        if status in (".", "P"):
+            continue
+        row = years.setdefault(day.year, ["."] * 12)
+        index = day.month - 1
+        if row[index] == ".":
+            row[index] = status
+        elif row[index] != status:
+            row[index] = "M"
+    return {year: "".join(row) for year, row in years.items()}
+
+
 def recent_ranges(day_counts, last_day, days=90):
     """Return the status of the last days as a list of ranges."""
     start = last_day - timedelta(days=days - 1)
@@ -1038,22 +1054,12 @@ def _print_report(result):
         print("    %-24s %s" % (span, labels[item["status"]]))
     print()
     if result["has_estimated"]:
-        print("ESTIMATED MAP (R real, E estimated, M mixed, . no data)")
+        print("READING MAP (R real, E estimated, M mixed, . no data)")
         months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        symbols = {}
-        for group in result["consumption_by_month"]:
-            year, month = group["key"].split("-")
-            if group["real_hours"] and group["estimated_hours"]:
-                symbols[(year, month)] = "M"
-            elif group["estimated_hours"]:
-                symbols[(year, month)] = "E"
-            else:
-                symbols[(year, month)] = "R"
         print("%-6s" % "" + " ".join(month.center(3) for month in months))
-        for year in sorted({key[0] for key in symbols}):
-            cells = [symbols.get((year, "%02d" % number), ".").center(3)
-                     for number in range(1, 13)]
+        for year in sorted(result["month_map"]):
+            cells = [result["month_map"][year][index].center(3) for index in range(12)]
             print(("%-6s" % year + " ".join(cells)).rstrip())
     else:
         print("No estimated data. All the data is real.")
@@ -1124,6 +1130,7 @@ def cmd_report(args):
                                             for name, slot in sorted(periods.items())}
                                 for year, periods in sorted(data["periods_year"].items())},
             "has_estimated": bool(data["estimated_days"]),
+            "month_map": month_map(counts),
             "consumption_by_year": _groups_list(data["groups"]["year"]),
             "consumption_by_month": _groups_list(data["groups"]["month"]),
             "consumption_by_hour": _groups_list(data["groups"]["hour"]),

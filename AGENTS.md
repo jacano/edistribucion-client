@@ -58,8 +58,8 @@ for each CUPS of the account, one after another. It contains:
 - the maximum consumption in one hour per year,
 - the maximum demanded power per year and per month,
 - a zoom of the last 3 months (the last reading and its delay, and the real,
-  estimated and pending ranges), and a monthly map (R real, E estimated,
-  M mixed, P pending, . no data).
+  estimated and pending ranges), and a monthly reading map (R real,
+  E estimated, M mixed, . no data; pending days do not count).
 
 Option:
 
