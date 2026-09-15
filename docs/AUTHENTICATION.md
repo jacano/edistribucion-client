@@ -70,8 +70,9 @@ It keeps only the cookies of the portal domain.
 
 ### The convention for the file
 
-By default the tool does not ask for a path. It looks in your `Downloads` and
-`Descargas` folders and uses the newest file that matches this rule:
+By default the tool does not ask for a path. It looks in the `Downloads` folder
+of your home, in the current folder and in the folder of the script. It uses
+the newest file that matches this rule:
 
 - the name ends in `.txt` or `.json`,
 - the file mentions `edistribucion`,

@@ -91,11 +91,11 @@ This is the reason for the two rules in this tool:
 
 The law gives two sets of hours:
 
-- Península, Illes Balears and Canarias: P1 10 h-14 h and 18 h-22 h.
+- Peninsula, Balearic Islands and Canary Islands: P1 10 h-14 h and 18 h-22 h.
 - Ceuta and Melilla: P1 11 h-15 h and 19 h-23 h, P2 8 h-11 h, 15 h-19 h and
   23 h-24 h, P3 0 h-8 h.
 
-This tool uses the hours of the Península, Illes Balears and Canarias.
+This tool uses the hours of the Peninsula, Balearic Islands and Canary Islands.
 
 The link to the law: <https://www.boe.es/buscar/act.php?id=BOE-A-2020-1066>
 (Article 7, point 3).

@@ -11,7 +11,8 @@ tool was built and tested with one real 2.0TD account.
 
 ## Zone
 
-- The period hours are the ones of the Peninsula, Illes Balears and Canarias.
+- The period hours are the ones of the Peninsula, Balearic Islands and Canary
+  Islands.
 - Ceuta and Melilla use other hours, so the period split can be wrong there.
 
 ## Environment
