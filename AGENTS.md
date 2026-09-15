@@ -106,6 +106,32 @@ See `docs/ASSUMPTIONS.md` for the full list of assumptions and limits.
 - The tests cover the pure logic only. They need no network and no session.
 - CI runs both on push to `main` and on pull requests.
 
+## Commits
+
+Use Conventional Commits. Keep the subject in one line. Add a body only when it
+helps.
+
+```
+type(scope): short description
+```
+
+- Type: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `chore`, `ci`,
+  `build`, `style` or `revert`.
+- The scope is optional. Use it for one part, for example `report` or `auth`.
+- Write the description in the imperative and in the lowercase. Do not end it
+  with a period. Keep the subject under 72 characters.
+- Add `!` after the type or the scope for a breaking change.
+
+Examples:
+
+```
+feat(report): add the reading map
+fix(auth): do not repeat the session check
+docs: add the architecture diagrams
+test: cover the day of the change of the hour
+ci: run the checks on Python 3.13
+```
+
 ## Files
 
 - `edistribucion.py`: the tool.
