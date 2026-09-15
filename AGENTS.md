@@ -115,5 +115,6 @@ See `docs/ASSUMPTIONS.md` for the full list of assumptions and limits.
 - `README.md`: the main guide.
 - `docs/INSTALL.md`: how to install and run the tool.
 - `docs/AUTHENTICATION.md`: how to get the session.
+- `docs/ARCHITECTURE.md`: the Aura protocol and the data flows, with diagrams.
 - `docs/TARIFF_2_0TD.md`: the 2.0TD periods and the period calculation.
 - `docs/ASSUMPTIONS.md`: what the tool assumes, and the limits.

@@ -144,6 +144,9 @@ it deletes the zip from the portal. The period (P1, P2, P3) is worked out from
 the 2.0TD calendar. All the details are in
 [docs/TARIFF_2_0TD.md](docs/TARIFF_2_0TD.md).
 
+The Aura protocol, the browserless login and the download flow have diagrams in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 The tool does not use the per-range API
 `WP_Measure_v3_CTRL.getChartPointsByRange`. It gives the curve, but only about
 35 days per call, so the full history needs many calls and does not scale. The
