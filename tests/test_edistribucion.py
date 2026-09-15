@@ -238,6 +238,34 @@ def test_groups_list_keeps_the_given_order():
     assert [row["key"] for row in ed._groups_list(groups, ["B", "A"])] == ["B", "A"]
 
 
+def test_longest_real_run():
+    counts = {
+        date(2026, 1, 5): {"real": 1, "estimated": 0, "kwh": 1.0},
+        date(2026, 1, 6): {"real": 1, "estimated": 0, "kwh": 1.0},
+        date(2026, 1, 7): {"real": 1, "estimated": 1, "kwh": 1.0},   # mixed, breaks
+        date(2026, 1, 9): {"real": 1, "estimated": 0, "kwh": 1.0},
+        date(2026, 1, 10): {"real": 1, "estimated": 0, "kwh": 1.0},
+        date(2026, 1, 11): {"real": 1, "estimated": 0, "kwh": 1.0},
+    }
+    assert ed.longest_real_run(counts) == [date(2026, 1, 9), date(2026, 1, 10),
+                                           date(2026, 1, 11)]
+    assert ed.longest_real_run({}) == []
+
+
+def test_aggregate_real_streak():
+    hours = {
+        (date(2026, 1, 7), 12): (1.0, True),    # Wednesday -> P1
+        (date(2026, 1, 8), 12): (2.0, True),    # Thursday -> P1
+        (date(2026, 1, 9), 12): (3.0, False),   # Friday, estimated -> breaks the run
+    }
+    streak = ed.aggregate(hours)["real_streak"]
+    assert streak["days"] == 2
+    assert streak["from"] == date(2026, 1, 7)
+    assert streak["to"] == date(2026, 1, 8)
+    assert streak["periods"] == {"P1": 3.0, "P2": 0.0, "P3": 0.0}
+    assert streak["kwh"] == 3.0
+
+
 # ---------------------------------------------------------------- measure_tariff
 def test_measure_tariff():
     listing = {"lstCups": [{"Id": "c1", "rate": "2.0TD"},

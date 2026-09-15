@@ -18,6 +18,8 @@ and covers every CUPS of the account, one after another. Each report contains:
 - the maximum demanded power per year, with the split by power period (P1 and
   P2) and the months above the contracted power (the full list per month is in
   the JSON),
+- the longest period in a row with real data only, with its totals by P1, P2,
+  P3 and the number of days, ready for a comparator,
 - a zoom of the last 3 months (the last reading and its delay) and a monthly
   reading map, so you see what is real, estimated or pending.
 
@@ -150,6 +152,11 @@ CONSUMPTION
     Day         real kWh    est. kWh   total kWh
     Mon          891.332     391.535    1282.867
     ...
+
+REAL STREAK (the longest period with real data only)
+  Period: 2025-01-21 -> 2025-07-22 (183 days)
+            P1          P2          P3       total
+       545.882     482.184     692.202    1720.268
 
 MAXIMUM PER YEAR
   Peak hour: the most energy in one hour (kWh), from the real values.

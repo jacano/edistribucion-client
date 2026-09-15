@@ -1046,6 +1046,25 @@ def fetch_hours(client, account, contracts, listing, wait_seconds=ZIP_WAIT_LIMIT
     return hours
 
 
+def longest_real_run(day_counts):
+    """Return the longest run of days in a row with real data only.
+
+    A day counts when it has real hours and no estimated hour. On a tie, keep
+    the most recent run.
+    """
+    days = sorted(day for day, value in day_counts.items()
+                  if value["real"] > 0 and value["estimated"] == 0)
+    best = []
+    run = []
+    for day in days:
+        if run and (day - run[-1]).days != 1:
+            run = []
+        run.append(day)
+        if len(run) >= len(best):
+            best = list(run)
+    return best
+
+
 def aggregate(hours, zone=ZONE_PENINSULA):
     """Build the consumption aggregates from {(day, hour): (kwh, real)}."""
     groups = {"year": {}, "month": {}, "hour": {}, "weekday": {}}
@@ -1115,6 +1134,19 @@ def aggregate(hours, zone=ZONE_PENINSULA):
         if last is None or day > last:
             last = day
 
+    streak_days = longest_real_run(day_counts)
+    streak = {"from": None, "to": None, "days": 0, "kwh": 0.0,
+              "periods": {"P1": 0.0, "P2": 0.0, "P3": 0.0}}
+    if streak_days:
+        in_streak = set(streak_days)
+        for (day, hour), (kwh, real) in hours.items():
+            if real and day in in_streak:
+                streak["periods"][tariff_period(day, hour, zone)] += kwh
+                streak["kwh"] += kwh
+        streak["from"] = streak_days[0]
+        streak["to"] = streak_days[-1]
+        streak["days"] = len(streak_days)
+
     return {
         "groups": groups,
         "periods_real_kwh": periods_real,
@@ -1127,6 +1159,7 @@ def aggregate(hours, zone=ZONE_PENINSULA):
         "estimated_days": estimated_days,
         "year_peak": year_peak,
         "month_peak": month_peak,
+        "real_streak": streak,
         "from": first,
         "to": last,
         "last_real": last_real,
@@ -1341,6 +1374,19 @@ def _print_report(result, titled=True):
     _print_kwh_table("  By month", "Month", result["consumption_by_month"])
     _print_kwh_table("  By hour of day", "Hour", result["consumption_by_hour"])
     _print_kwh_table("  By weekday", "Day", result["consumption_by_weekday"])
+    streak = result["real_streak"]
+    print()
+    print("REAL STREAK (the longest period with real data only)")
+    if streak["days"]:
+        print("  Period: %s -> %s (%d days)"
+              % (streak["from"], streak["to"], streak["days"]))
+        names = sorted(streak["periods_kwh"])
+        print("    %s  %10s" % ("  ".join("%10s" % name for name in names), "total"))
+        print("    %s  %10.3f"
+              % ("  ".join("%10.3f" % streak["periods_kwh"][name] for name in names),
+                 streak["kwh"]))
+    else:
+        print("  No period with only real data.")
     print()
     print("MAXIMUM PER YEAR")
     print("  Peak hour: the most energy in one hour (kWh), from the real values.")
@@ -1469,6 +1515,16 @@ def _build_report(client, account, cups, group, listing, wait_seconds, keep_arti
                                                "estimated": round(slot["estimated"], 3)}
                                         for name, slot in sorted(periods.items())}
                             for year, periods in sorted(data["periods_year"].items())},
+        "real_streak": {
+            "from": (data["real_streak"]["from"].isoformat()
+                     if data["real_streak"]["from"] else None),
+            "to": (data["real_streak"]["to"].isoformat()
+                   if data["real_streak"]["to"] else None),
+            "days": data["real_streak"]["days"],
+            "kwh": round(data["real_streak"]["kwh"], 3),
+            "periods_kwh": {k: round(v, 3)
+                            for k, v in data["real_streak"]["periods"].items()},
+        },
         "has_estimated": bool(data["estimated_days"]),
         "month_map": month_map(counts),
         "consumption_by_year": _groups_list(data["groups"]["year"]),

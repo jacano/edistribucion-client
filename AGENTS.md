@@ -62,6 +62,8 @@ contains:
 - the maximum demanded power per year, with the split by power period (P1 and
   P2) and the months above the contracted power (the full list per month is in
   the JSON),
+- the longest period in a row with real data only, with its totals by P1, P2,
+  P3 and the number of days, ready for a comparator,
 - a zoom of the last 3 months (the last reading and its delay, and the real,
   estimated and pending ranges), and a monthly reading map (R real,
   E estimated, M mixed, . no data; pending days do not count).
