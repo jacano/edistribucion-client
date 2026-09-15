@@ -40,7 +40,9 @@ This file tells an LLM agent what this tool is and how to use it.
 | `edistribucion set-session --sid` | store a session value by hand |
 
 The options `--sid`, `--session`, `--wait`, `--keep-artifacts`, `--quiet`,
-`--verbose`, `--zone` and `--export-csv` go before or after the command.
+`--verbose`, `--zone`, `--export-csv` and `--trace` go before or after the
+command. `--trace` writes every request, every response and every downloaded
+file to a folder (one for each run), for troubleshooting.
 
 ## report
 

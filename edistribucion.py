@@ -77,6 +77,7 @@ def state_path(name):
 
 DEFAULT_SESSION = state_path("session.json")
 DEFAULT_CREDENTIALS = state_path("credentials.json")
+DEFAULT_TRACE = os.path.join(os.path.dirname(DEFAULT_SESSION), "traces")
 USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36")
 
@@ -161,18 +162,85 @@ ZIP_WAIT_LIMIT = 180                 # seconds to wait for the zip
 
 _QUIET = False
 _VERBOSE = False
+_TRACE = None
+
+
+def headers_text(headers):
+    """Return the headers as text, one per line."""
+    return "\n".join("%s: %s" % (key, headers[key]) for key in sorted(headers))
+
+
+def body_text(body):
+    """Return a request body as text."""
+    if body is None:
+        return ""
+    return body.decode("utf-8", "replace") if isinstance(body, bytes) else str(body)
+
+
+class Trace:
+    """Write the requests, the responses and the files of one run to a folder.
+
+    Use one folder for each run, so a report is easy to inspect later. The
+    folder holds the session cookie and the token: keep it private.
+    """
+
+    def __init__(self, path):
+        self.path = path
+        self.count = 0
+        os.makedirs(path, exist_ok=True)
+
+    def start(self, label):
+        """Return the name of the next call, for example 003-create_zip."""
+        self.count += 1
+        return "%03d-%s" % (self.count, label)
+
+    def log(self, message):
+        self._write("log.txt", message + "\n", append=True)
+
+    def request(self, index, method, url, headers, body):
+        self._write("%s-request.txt" % index,
+                    "%s %s\n\n%s\n\n%s\n" % (method, url, headers_text(headers),
+                                             body_text(body)))
+
+    def response(self, index, status, headers, text):
+        self._write("%s-response.txt" % index,
+                    "HTTP %s\n\n%s\n\n%s\n" % (status, headers_text(headers), text))
+
+    def file(self, name, payload):
+        """Write raw bytes, for example the zip of the measures."""
+        with open(os.path.join(self.path, name), "wb") as handle:
+            handle.write(payload)
+
+    def _write(self, name, text, append=False):
+        with open(os.path.join(self.path, name), "a" if append else "w",
+                  encoding="utf-8") as handle:
+            handle.write(text)
+
+
+def trace_start(base_dir):
+    """Start a trace in a new folder. Return the Trace."""
+    global _TRACE
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    path = os.path.join(base_dir, stamp)
+    _TRACE = Trace(path)
+    log("Trace folder: %s" % path)
+    return _TRACE
 
 
 def log(message):
     """Write a progress line to stderr, so stdout stays clean."""
     if not _QUIET:
         print(message, file=sys.stderr)
+    if _TRACE is not None:
+        _TRACE.log(message)
 
 
 def debug(message):
     """Write a detail line, only with --verbose."""
     if _VERBOSE and not _QUIET:
         print(message, file=sys.stderr)
+    if _TRACE is not None and _VERBOSE:
+        _TRACE.log(message)
 
 
 # ---------------------------------------------------------------- session/HTTP
@@ -332,6 +400,8 @@ def _jar_sid(jar):
 
 
 def _fetch(opener, url):
+    if _TRACE is not None:
+        _TRACE.log("  fetch: %s" % url)
     request = urllib.request.Request(
         url, headers={"User-Agent": USER_AGENT,
                       "Accept": "text/html,application/xhtml+xml"})
@@ -374,8 +444,13 @@ def portal_login(username, password, start_url=""):
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
             "Origin": BASE, "Referer": BASE + page_uri,
             "User-Agent": USER_AGENT, "Accept": "*/*"})
+    index = _TRACE.start("login") if _TRACE is not None else None
+    if _TRACE is not None:
+        _TRACE.request(index, "POST", request.full_url, dict(request.headers), body)
     with opener.open(request, timeout=HTTP_TIMEOUT) as response:
         text = response.read().decode("utf-8", "replace")
+        if _TRACE is not None:
+            _TRACE.response(index, response.status, response.headers, text)
 
     sid = _jar_sid(jar)
     if not sid:
@@ -413,18 +488,27 @@ class Client:
         self.app_version = APP_VERSION
 
     # --- low level HTTP ---
-    def _request(self, method, url, data=None, extra_headers=None):
+    def _request(self, method, url, data=None, extra_headers=None, label="http"):
         headers = {"User-Agent": USER_AGENT, "Accept": "*/*"}
         if self.session.sid:
             headers["Cookie"] = self.session.cookie_header()
         if extra_headers:
             headers.update(extra_headers)
         request = urllib.request.Request(url, data=data, method=method, headers=headers)
+        index = _TRACE.start(label) if _TRACE is not None else None
+        if _TRACE is not None:
+            _TRACE.request(index, method, url, headers, data)
         try:
             with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT) as response:
-                return response.status, response.headers, response.read().decode("utf-8", "replace")
+                text = response.read().decode("utf-8", "replace")
+                if _TRACE is not None:
+                    _TRACE.response(index, response.status, response.headers, text)
+                return response.status, response.headers, text
         except urllib.error.HTTPError as exc:
-            return exc.code, exc.headers, exc.read().decode("utf-8", "replace")
+            text = exc.read().decode("utf-8", "replace")
+            if _TRACE is not None:
+                _TRACE.response(index, exc.code, exc.headers, text)
+            return exc.code, exc.headers, text
 
     def _read_context(self, text):
         """Refresh fwuid and app version from an Aura response context."""
@@ -447,7 +531,7 @@ class Client:
         debug("  token: GET %s" % page_uri)
         status, headers, _ = self._request(
             "GET", BASE + page_uri,
-            extra_headers={"Accept": "text/html,application/xhtml+xml"})
+            extra_headers={"Accept": "text/html,application/xhtml+xml"}, label="token")
         token = None
         for cookie in (headers.get_all("Set-Cookie") or []):
             match = re.match(r"(__Host-ERIC[A-Za-z0-9_\-]*)=([^;]+)", cookie)
@@ -476,7 +560,7 @@ class Client:
         status, _, text = self._request(
             "POST", "%s?r=1&other.%s=1" % (AURA_ENDPOINT, route), data=body,
             extra_headers={"Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                           "Origin": BASE, "Referer": BASE + page_uri})
+                           "Origin": BASE, "Referer": BASE + page_uri}, label=action)
         if "/*ERROR*/" in text and retry:
             # stale token: refresh once and retry
             self.token(page_uri, force=True)
@@ -532,8 +616,16 @@ class Client:
         if self.session.sid:
             headers["Cookie"] = self.session.cookie_header()
         request = urllib.request.Request(url, headers=headers)
+        index = _TRACE.start("download") if _TRACE is not None else None
+        if _TRACE is not None:
+            _TRACE.request(index, "GET", url, headers, None)
         with urllib.request.urlopen(request, timeout=DOWNLOAD_TIMEOUT) as response:
-            return response.read()
+            payload = response.read()
+            if _TRACE is not None:
+                _TRACE.response(index, response.status, response.headers,
+                                "<%d bytes>" % len(payload))
+                _TRACE.file("%s-%s.zip" % (index, fileid), payload)
+            return payload
 
     def get_maximeter(self, cups_id, visibility_id, start_date, end_date):
         page = "%s?aId=%s&sId=%s" % (MAXPOWER_PAGE, cups_id, visibility_id)
@@ -1602,6 +1694,9 @@ def build_parser():
                         help="2.0TD zone (default: from the postal code of the supply)")
     parser.add_argument("--export-csv", default=None, metavar="FILE",
                         help="write the hourly curves to a CSV that a comparator can read")
+    parser.add_argument("--trace", nargs="?", const=True, default=None, metavar="DIR",
+                        help="write the requests, the responses and the files of the run "
+                             "to DIR (default: the state folder)")
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--session", default=argparse.SUPPRESS)
     common.add_argument("--sid", default=argparse.SUPPRESS)
@@ -1612,6 +1707,7 @@ def build_parser():
     common.add_argument("--zone", choices=["peninsula", "ceuta-melilla"],
                         default=argparse.SUPPRESS)
     common.add_argument("--export-csv", default=argparse.SUPPRESS)
+    common.add_argument("--trace", nargs="?", const=True, default=argparse.SUPPRESS)
     sub = parser.add_subparsers(dest="command", required=True)
 
     session_cmd = sub.add_parser("set-session", parents=[common],
@@ -1654,6 +1750,9 @@ def main(argv=None):
     global _QUIET, _VERBOSE
     _QUIET = getattr(args, "quiet", False)
     _VERBOSE = getattr(args, "verbose", False)
+    trace = getattr(args, "trace", None)
+    if trace is not None:
+        trace_start(DEFAULT_TRACE if trace is True else trace)
     try:
         args.func(args)
     except Exception as exc:

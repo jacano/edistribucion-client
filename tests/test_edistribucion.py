@@ -129,6 +129,23 @@ def test_export_path_for():
     assert ed.export_path_for("a.csv", "ES00", True) == "a-ES00.csv"
 
 
+# -------------------------------------------------------------------- trace
+def test_trace_writes_the_call(tmp_path):
+    trace = ed.Trace(str(tmp_path))
+    index = trace.start("login_info")
+    trace.request(index, "POST", "https://example/a", {"Cookie": "sid=x"}, b"aura.token=t")
+    trace.response(index, 200, {"Content-Type": "text/plain"}, "hello")
+    names = sorted(item.name for item in tmp_path.iterdir())
+    assert names == ["001-login_info-request.txt", "001-login_info-response.txt"]
+    request = (tmp_path / "001-login_info-request.txt").read_text(encoding="utf-8")
+    assert "POST https://example/a" in request
+    assert "Cookie: sid=x" in request
+    assert "aura.token=t" in request
+    response = (tmp_path / "001-login_info-response.txt").read_text(encoding="utf-8")
+    assert "HTTP 200" in response
+    assert "hello" in response
+
+
 # ------------------------------------------------------------- max demand periods
 def test_demand_point():
     point = ed.demand_point({"val": "5,024", "date": "20-02-2025 21:45"})

@@ -93,6 +93,9 @@ The tool has these options. They work with every command:
   one of the portal (`CUPS;Fecha;Hora;AE_kWh;AS_KWh;AE_AUTOCONS_kwh;REAL/ESTIMADO`),
   so the file works with the CSV import of the electricity comparators. With
   several CUPS, the tool adds the CUPS to the name of the file.
+- `--trace [DIR]` writes every request, every response and every downloaded file
+  to a folder, one folder for each run. The default folder is `traces` in the
+  state folder. See "Troubleshooting" below.
 
 Add them before or after the command.
 
@@ -114,6 +117,21 @@ The portal can disable the notification for a role. The setting is "No deseo
 recibir más notificaciones para este rol" (I do not want more notifications for
 this role). When it is on, the portal makes no notification, and there is
 nothing to delete.
+
+### Troubleshooting
+
+Add `--trace` to keep everything the tool sends and receives. The tool writes
+one folder for each run, with this content:
+
+- `log.txt`: the progress lines,
+- `NNN-<action>-request.txt`: the request: the method, the URL, the headers and
+  the body,
+- `NNN-<action>-response.txt`: the status, the headers and the raw response,
+- `NNN-download-<id>.zip`: the zip of the hourly curves.
+
+Use it when a run fails, and keep the folder. The folder holds the session
+cookie, the token, and the user and the password of a `login` run. Keep it
+private. Do not put it in a public place.
 
 Example output:
 
