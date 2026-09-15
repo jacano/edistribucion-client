@@ -114,6 +114,9 @@ See `docs/ASSUMPTIONS.md` for the full list of assumptions and limits.
 - `pip install -e ".[dev]"`, then `ruff check .` and `pytest`.
 - The tests cover the pure logic only. They need no network and no session.
 - CI runs both on push to `main` and on pull requests.
+- After each change, run `ruff check .` and `pytest` in the local folder.
+- Do not wait for the CI on GitHub. The local run is faster and gives the same
+  result.
 
 ## Commits
 
