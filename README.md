@@ -170,8 +170,9 @@ network.
 
 The file `session.json` holds your live session cookie. The file
 `credentials.json` holds your saved credentials: the username, and on Windows
-the encrypted password. The `.gitignore` file excludes both. Do not commit
-them. Do not share them.
+the encrypted password. On macOS and Linux the password stays in the Keychain
+or in libsecret, and the file holds the username only. The `.gitignore` file
+excludes both files. Do not commit them. Do not share them.
 
 The tool reads data from your own account only.
 
