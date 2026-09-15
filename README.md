@@ -1,11 +1,10 @@
 # e-distribucion client
 
 This tool reads electricity data from the e-distribucion private area (Endesa
-group) for your own account. It uses HTTP only. It uses only the Python
-standard library.
+group) for your own account. It uses HTTP only, with no browser and no
+third-party package.
 
-It gives one thing: a **full report**. The report uses all the data available
-and covers every CUPS of the account, one after another. Each report contains:
+It gives one **full report** for each CUPS of the account. Each report contains:
 
 - the tariff of the supply,
 - the zone of the supply (the Peninsula, Baleares and Canarias hours, or the
@@ -73,8 +72,8 @@ edistribucion report
 ```
 
 The report uses all the data available. You do not set a period. With several
-CUPS, the tool first prints a summary table (one line per CUPS with its totals),
-then one full report for each CUPS under a banner `CUPS i of N`.
+CUPS, the tool prints a summary table first (one line per CUPS with its totals),
+then one report for each CUPS under a banner `CUPS i of N`.
 
 Option:
 
