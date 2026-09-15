@@ -71,9 +71,9 @@ python edistribucion.py login   # file, without installing
 edistribucion report
 ```
 
-The report uses all the data available. You do not set a period. With several
-CUPS, the tool prints a summary table first (one line per CUPS with its totals),
-then one report for each CUPS under a banner `CUPS i of N`.
+The report uses all the history by default. Use `--months N` for a shorter
+period. With several CUPS, the tool prints a summary table first (one line per
+CUPS with its totals), then one report for each CUPS under a banner `CUPS i of N`.
 
 Option:
 
@@ -83,6 +83,8 @@ The tool has these options. Add them before or after the command:
 
 - `--wait SECONDS` sets the time to wait for the portal zip (default 180).
 - `--keep-artifacts` keeps the zip file and the portal notification (see below).
+- `--months N` reports only the last N complete months. Without it, the report
+  covers all the history. See "The report period" below.
 - `--quiet` hides the progress lines.
 - `--verbose` shows more detail, such as the token refresh.
 - `--zone ZONE` sets the 2.0TD zone: `peninsula` or `ceuta-melilla`. Without it,
@@ -114,6 +116,21 @@ The portal can disable the notification for a role. The setting is "No deseo
 recibir más notificaciones para este rol" (I do not want more notifications for
 this role). When it is on, the portal makes no notification, and there is
 nothing to delete.
+
+### The report period
+
+By default the report covers **all the history**. The tool asks the portal for
+every contract version of the CUPS and every hour of consumption. A long
+history is a large zip, so the download and the read take longer.
+
+Use `--months N` to report only the last N complete months:
+
+```bash
+edistribucion report --months 12    # the last 12 closed months
+```
+
+The tool leaves out the current month, because it is not closed. The last 12
+closed months are the period that a comparator needs.
 
 ### Troubleshooting
 

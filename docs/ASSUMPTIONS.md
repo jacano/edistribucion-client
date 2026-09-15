@@ -33,6 +33,10 @@ tool was built and tested with one real 2.0TD account.
   app version, the cookie names or the file format. Then the tool can stop.
 - The portal makes the zip in the background. A large account can need more
   than the 3 minute wait.
+- The report covers all the history by default. The tool asks for every contract
+  version of the CUPS and every hour of consumption. A long history makes a
+  large zip and a slower run. Use `--months N` to limit the report to the last
+  N complete months.
 - The tool deletes the zip file and its notification after the read. Use
   `--keep-artifacts` to keep both on the portal.
 - The portal makes no notification when the role has the setting to stop the

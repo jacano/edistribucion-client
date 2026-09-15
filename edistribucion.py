@@ -23,7 +23,7 @@ Session: session.json (or the EDIST_SID environment variable). Commands:
   python edistribucion.py login [--save]        # log in with user and password
   python edistribucion.py import-cookies [FILE] # import a cookies.txt
   python edistribucion.py set-session --sid "X" # store a session by hand
-  python edistribucion.py report [--json]       # full report for every CUPS
+  python edistribucion.py report [--json] [--months N] # report for every CUPS
 """
 import argparse
 import base64
@@ -711,6 +711,35 @@ def clock_hour(count, index):
     return min(hour, 23)
 
 
+def months_back(day, months):
+    """Return the first day of the month that is `months` months before `day`."""
+    index = day.month - 1 - months
+    return date(day.year + index // 12, index % 12 + 1, 1)
+
+
+def month_window(months, today=None):
+    """Return the first and the last day of the last `months` complete months.
+
+    With `months` equal to 1, it gives the last complete month. With 12, the
+    last twelve. With 0 or less, it gives (None, None), so the caller keeps
+    the whole history. A complete month leaves out the current month, which
+    is not closed.
+    """
+    if months <= 0:
+        return None, None
+    today = today or date.today()
+    first = months_back(today, months)
+    last = months_back(today, 0) - timedelta(days=1)
+    return first, last
+
+
+def in_window(day, window):
+    """Say if a day is inside a (first, last) window. (None, None) keeps all days."""
+    if not window or window[0] is None:
+        return True
+    return window[0] <= day <= window[1]
+
+
 def read_zip_rows(payload):
     """Return the rows of the hourly CSV files in the zip.
 
@@ -762,19 +791,22 @@ def zip_hours(payload):
         yield day, clock_hour(count, index), kwh, real
 
 
-def write_hours_csv(payload, cups, path):
+def write_hours_csv(payload, cups, path, window=None):
     """Write the hourly curves as a CSV that other tools can read.
 
     The header is the one of the portal, so the file works with the CSV import
     of the electricity comparators: CUPS;Fecha;Hora;AE_kWh;AS_KWh;
     AE_AUTOCONS_kwh;REAL/ESTIMADO. `Hora` counts from 1 inside the day, so a day
-    of the change of the hour has 23 or 25 rows.
+    of the change of the hour has 23 or 25 rows. The window keeps only the days
+    inside it.
     """
     with open(path, "w", encoding="utf-8", newline="") as handle:
         writer = csv.writer(handle, delimiter=";")
         writer.writerow(["CUPS", "Fecha", "Hora", "AE_kWh", "AS_KWh",
                          "AE_AUTOCONS_kwh", "REAL/ESTIMADO"])
         for day, index, _count, kwh, real in read_zip_rows(payload):
+            if not in_window(day, window):
+                continue
             writer.writerow([cups or "", day.strftime("%d/%m/%Y"), index,
                              "%.3f" % kwh, "0.0", "0.0", "R" if real else "E"])
 
@@ -1123,16 +1155,18 @@ def _download_measure_zip(client, account, contracts, listing, wait_seconds, kee
 
 
 def fetch_hours(client, account, contracts, listing, wait_seconds=ZIP_WAIT_LIMIT,
-                keep_artifacts=False, export_path=None, cups=None):
+                keep_artifacts=False, export_path=None, cups=None, window=None):
     """Download the zip and return {(day, hour): (kwh, real)}."""
     payload = _download_measure_zip(client, account, contracts, listing, wait_seconds,
                                     keep_artifacts)
     if payload and export_path:
-        write_hours_csv(payload, cups, export_path)
+        write_hours_csv(payload, cups, export_path, window)
         log("Wrote the hourly CSV to %s." % export_path)
     hours = {}
     if payload:
         for day, hour, kwh, real in zip_hours(payload):
+            if not in_window(day, window):
+                continue
             key = (day, hour)
             old = hours.get(key)
             if old is None or (real and not old[1]):
@@ -1263,10 +1297,11 @@ def aggregate(hours, zone=ZONE_PENINSULA):
 
 
 def collect_consumption(client, account, contracts, listing, wait_seconds=ZIP_WAIT_LIMIT,
-                        keep_artifacts=False, zone=ZONE_PENINSULA, export_path=None, cups=None):
+                        keep_artifacts=False, zone=ZONE_PENINSULA, export_path=None,
+                        cups=None, window=None):
     """Download the history and return the aggregates."""
     return aggregate(fetch_hours(client, account, contracts, listing, wait_seconds,
-                                 keep_artifacts, export_path, cups), zone)
+                                 keep_artifacts, export_path, cups, window), zone)
 
 
 def _groups_list(group_dict, order=None):
@@ -1552,19 +1587,24 @@ def _print_report(result, titled=True):
 
 
 def _build_report(client, account, cups, group, listing, wait_seconds, keep_artifacts,
-                  zone=None, export_path=None):
+                  zone=None, export_path=None, months=0):
     """Build the report of one CUPS. Return None when the CUPS has no data."""
     visibility = account["visibility_id"]
     current = next((item for item in group if not item.get("end")), group[-1])
     zone = zone or supply_zone(current)
     log("Zone: %s" % ZONE_LABELS.get(zone, zone))
+    window = month_window(months)
+    if window[0]:
+        log("The last %d complete months: %s -> %s." % (months, window[0], window[1]))
+    else:
+        log("All the history. Use --months N for the last N complete months.")
     log("Reading the tariff...")
     tariff = measure_tariff(listing, group)
     if tariff and not tariff.startswith(SUPPORTED_TARIFF):
         raise RuntimeError("Unsupported tariff: %s. This tool supports 2.0TD only."
                            % tariff)
     data = collect_consumption(client, account, group, listing, wait_seconds, keep_artifacts,
-                               zone, export_path, cups)
+                               zone, export_path, cups, window)
     if not data["from"]:
         log("  No data for this CUPS.")
         return None
@@ -1657,7 +1697,8 @@ def cmd_report(args):
         group = [item for item in supplies if item["cups"] == cups]
         result = _build_report(client, account, cups, group, listing, args.wait,
                                args.keep_artifacts, zone,
-                               export_path_for(args.export_csv, cups, several))
+                               export_path_for(args.export_csv, cups, several),
+                               getattr(args, "months", 0))
         if result:
             reports.append(result)
     if not reports:
@@ -1699,6 +1740,8 @@ def build_parser():
                         help="2.0TD zone (default: from the postal code of the supply)")
     parser.add_argument("--export-csv", default=None, metavar="FILE",
                         help="write the hourly curves to a CSV that a comparator can read")
+    parser.add_argument("--months", type=int, default=0, metavar="N",
+                        help="report only the last N complete months (default: all the history)")
     parser.add_argument("--trace", nargs="?", const=True, default=None, metavar="DIR",
                         help="write the requests, the responses and the files of the run "
                              "to DIR (default: the state folder)")
@@ -1712,6 +1755,7 @@ def build_parser():
     common.add_argument("--zone", choices=["peninsula", "ceuta-melilla"],
                         default=argparse.SUPPRESS)
     common.add_argument("--export-csv", default=argparse.SUPPRESS)
+    common.add_argument("--months", type=int, default=argparse.SUPPRESS, metavar="N")
     common.add_argument("--trace", nargs="?", const=True, default=argparse.SUPPRESS)
     sub = parser.add_subparsers(dest="command", required=True)
 

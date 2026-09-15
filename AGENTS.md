@@ -39,10 +39,10 @@ This file tells an LLM agent what this tool is and how to use it.
 | `edistribucion import-cookies` | import a cookies.txt |
 | `edistribucion set-session --sid` | store a session value by hand |
 
-The options `--sid`, `--session`, `--wait`, `--keep-artifacts`, `--quiet`,
-`--verbose`, `--zone`, `--export-csv` and `--trace` go before or after the
-command. `--trace` writes every request, every response and every downloaded
-file to a folder (one for each run), for troubleshooting.
+The options `--sid`, `--session`, `--wait`, `--keep-artifacts`, `--months`,
+`--quiet`, `--verbose`, `--zone`, `--export-csv` and `--trace` go before or
+after the command. `--trace` writes every request, every response and every
+downloaded file to a folder (one for each run), for troubleshooting.
 
 ## report
 
@@ -83,6 +83,10 @@ Then the tool deletes the zip and the notification. Add `--keep-artifacts` to ke
 on the portal. The period (P1, P2, P3) comes from the 2.0TD calendar and the
 zone of the supply, not from a data call. The zone comes from the postal code
 (51xxx is Ceuta, 52xxx is Melilla); `--zone` sets it by hand.
+
+The report covers all the history by default. The tool asks for every contract
+version of the CUPS and every hour of consumption, so a long history takes
+longer. `--months N` reports only the last N complete months.
 
 The tool does not use the per-range API `getChartPointsByRange`: it covers only
 about 35 days per call, so the full history needs many calls and does not scale.

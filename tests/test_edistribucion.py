@@ -67,6 +67,32 @@ def test_supply_zone_from_city():
     assert ed.supply_zone({}) == ed.ZONE_PENINSULA
 
 
+# --------------------------------------------------------------------- window
+def test_months_back():
+    assert ed.months_back(date(2026, 9, 15), 12) == date(2025, 9, 1)
+    assert ed.months_back(date(2026, 1, 31), 1) == date(2025, 12, 1)
+    assert ed.months_back(date(2026, 3, 15), 14) == date(2025, 1, 1)
+    assert ed.months_back(date(2026, 9, 15), 0) == date(2026, 9, 1)
+
+
+def test_month_window():
+    today = date(2026, 9, 15)
+    assert ed.month_window(12, today) == (date(2025, 9, 1), date(2026, 8, 31))
+    assert ed.month_window(1, today) == (date(2026, 8, 1), date(2026, 8, 31))
+    assert ed.month_window(0, today) == (None, None)
+    assert ed.month_window(-3, today) == (None, None)
+
+
+def test_in_window():
+    window = (date(2026, 8, 1), date(2026, 8, 31))
+    assert ed.in_window(date(2026, 8, 1), window)
+    assert ed.in_window(date(2026, 8, 31), window)
+    assert not ed.in_window(date(2026, 7, 31), window)
+    assert not ed.in_window(date(2026, 9, 1), window)
+    assert ed.in_window(date(2020, 1, 1), (None, None))
+    assert ed.in_window(date(2020, 1, 1), None)
+
+
 # ------------------------------------------------------------------- clock_hour
 def test_clock_hour_normal_day():
     assert ed.clock_hour(24, 1) == 0
