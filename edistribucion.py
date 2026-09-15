@@ -1341,25 +1341,25 @@ def _print_report(result, titled=True):
           for name in names}),
     ]
     print("  %-11s %10s %16s  %s" % ("Consumption", "kWh", "hours",
-                                     "  ".join("%9s" % name for name in names)))
+                                     "  ".join("%9s" % (name + " kWh") for name in names)))
     for label, kwh, hours, periods in rows:
         cells = "  ".join("%9.3f" % periods.get(name, 0.0) for name in names)
         print("  %-11s %10.3f %16s  %s" % (
             label, kwh, "%d h (%d d)" % (hours, round(hours / 24.0)), cells))
     print("  By year")
-    print("    %-7s %11s %11s %11s   %14s %14s"
+    print("    %-7s %11s %11s %11s   %-14s %-14s"
           % ("Year", "real kWh", "est. kWh", "total kWh", "real hours", "est. hours"))
     for group in result["consumption_by_year"]:
         real = group["real_kwh"]
         estimated = group["estimated_kwh"]
         real_h = group["real_hours"]
         estimated_h = group["estimated_hours"]
-        print("    %-7s %11.3f %11.3f %11.3f   %14s %14s"
+        print("    %-7s %11.3f %11.3f %11.3f   %-14s %-14s"
               % (group["key"], real, estimated, real + estimated,
                  "%d h (%d d)" % (real_h, round(real_h / 24.0)),
                  "%d h (%d d)" % (estimated_h, round(estimated_h / 24.0))))
 
-    print("  By year period")
+    print("  By year period (kWh)")
     header = "    %-7s" % "Year"
     for name in names:
         header += "  %10s %10s" % (name + " real", name + " est")
@@ -1381,7 +1381,8 @@ def _print_report(result, titled=True):
         print("  Period: %s -> %s (%d days)"
               % (streak["from"], streak["to"], streak["days"]))
         names = sorted(streak["periods_kwh"])
-        print("    %s  %10s" % ("  ".join("%10s" % name for name in names), "total"))
+        print("    %s  %10s"
+              % ("  ".join("%10s" % (name + " kWh") for name in names), "total kWh"))
         print("    %s  %10.3f"
               % ("  ".join("%10.3f" % streak["periods_kwh"][name] for name in names),
                  streak["kwh"]))
@@ -1418,17 +1419,12 @@ def _print_report(result, titled=True):
         for name, limit in limits:
             point = info.get(name)
             if point and limit and point["kw"] > limit:
-                over.append("%s %s %.3f kW" % (month_key, name, point["kw"]))
+                over.append((month_key, name, point["kw"]))
     print("  The portal does not return every month.")
     if over:
         print("  Months above the contracted power (possible excess):")
-        line = "   "
-        for item in over:
-            if len(line) + len(item) > 74:
-                print(line)
-                line = "   "
-            line += " " + item
-        print(line)
+        for month_key, name, kw in over:
+            print("    %-8s %-3s %8.3f kW" % (month_key, name, kw))
     else:
         print("  No month above the contracted power.")
     print()
