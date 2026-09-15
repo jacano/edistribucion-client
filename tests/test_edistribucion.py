@@ -1,5 +1,6 @@
 """Unit tests for the pure logic of the tool. No network and no session."""
 import io
+import urllib.parse
 import zipfile
 from datetime import date
 
@@ -130,6 +131,16 @@ def test_export_path_for():
 
 
 # -------------------------------------------------------------------- trace
+def test_body_text_masks_only_the_credentials():
+    body = urllib.parse.urlencode({"message": '{"username":"user-abc","password":"secret"}',
+                                   "aura.token": "eyJabc"})
+    text = ed.body_text(body)
+    assert "secret" not in text
+    assert "user-abc" not in text
+    assert "eyJabc" in text
+    assert ed.body_text(None) == ""
+
+
 def test_trace_writes_the_call(tmp_path):
     trace = ed.Trace(str(tmp_path))
     index = trace.start("login_info")

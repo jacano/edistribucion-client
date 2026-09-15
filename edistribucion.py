@@ -171,17 +171,28 @@ def headers_text(headers):
 
 
 def body_text(body):
-    """Return a request body as text."""
+    """Return a request body as text, with the user and the password masked.
+
+    The login body is a form. The user and the password sit inside the `message`
+    field, so they can come plain or percent encoded. The session cookie and the
+    token stay as they are.
+    """
     if body is None:
         return ""
-    return body.decode("utf-8", "replace") if isinstance(body, bytes) else str(body)
+    text = body.decode("utf-8", "replace") if isinstance(body, bytes) else str(body)
+    text = re.sub(r'(%22password%22%3A%22)(.*?)(%22)', r"\1<masked>\3", text)
+    text = re.sub(r'(%22username%22%3A%22)(.*?)(%22)', r"\1<masked>\3", text)
+    text = re.sub(r'("password":\s*")[^"]*(")', r"\1<masked>\2", text)
+    text = re.sub(r'("username":\s*")[^"]*(")', r"\1<masked>\2", text)
+    return text
 
 
 class Trace:
     """Write the requests, the responses and the files of one run to a folder.
 
-    Use one folder for each run, so a report is easy to inspect later. The
-    folder holds the session cookie and the token: keep it private.
+    Use one folder for each run, so a report is easy to inspect later. The user
+    and the password are masked. The folder holds the session cookie and the
+    token: keep it private.
     """
 
     def __init__(self, path):

@@ -129,9 +129,9 @@ one folder for each run, with this content:
 - `NNN-<action>-response.txt`: the status, the headers and the raw response,
 - `NNN-download-<id>.zip`: the zip of the hourly curves.
 
-Use it when a run fails, and keep the folder. The folder holds the session
-cookie, the token, and the user and the password of a `login` run. Keep it
-private. Do not put it in a public place.
+Use it when a run fails, and keep the folder. The tool masks the user and the
+password of a `login` run. The session cookie and the token stay as they are.
+Keep the folder private. Do not put it in a public place.
 
 Example output:
 
