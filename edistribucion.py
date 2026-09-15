@@ -16,8 +16,8 @@ How it works (Salesforce Experience Cloud / Aura):
     (the "massive download" page). The per-range API
     `WP_Measure_v3_CTRL.getChartPointsByRange` is not used: it covers only about
     35 days per call, so the full history needs many calls and does not scale.
-    The period (P1 / P2 / P3) is worked out from the date and the hour with the
-    2.0TD calendar.
+    The period (P1 / P2 / P3) is worked out from the date, the hour and the zone
+    with the 2.0TD calendar. The zone comes from the postal code of the supply.
 
 Session: session.json (or the EDIST_SID environment variable). Commands:
   python edistribucion.py login [--save]        # log in with user and password
@@ -120,6 +120,29 @@ ACTIONS = {
 # The portal uses the same set, so the dates with no fixed date (Easter) are not
 # off-peak.
 FIXED_HOLIDAYS = {(1, 1), (1, 6), (5, 1), (8, 15), (10, 12), (11, 1), (12, 6), (12, 8), (12, 25)}
+
+# The period hours depend on the zone. The Peninsula, the Balearic Islands and
+# the Canary Islands share one set. Ceuta and Melilla share the other set, one
+# hour later. P3 (0-8 h) is the same in every zone, and so is the all-day P3 of
+# a Saturday, a Sunday and a fixed national holiday.
+ZONE_PENINSULA = "peninsula"
+ZONE_CEUTA_MELILLA = "ceuta_melilla"
+ZONE_LABELS = {
+    ZONE_PENINSULA: "Peninsula, Baleares and Canarias",
+    ZONE_CEUTA_MELILLA: "Ceuta and Melilla",
+}
+ZONE_PEAK_HOURS = {
+    ZONE_PENINSULA: ((10, 14), (18, 22)),
+    ZONE_CEUTA_MELILLA: ((11, 15), (19, 23)),
+}
+ZONE_FLAT_HOURS = {
+    ZONE_PENINSULA: ((8, 10), (14, 18), (22, 24)),
+    ZONE_CEUTA_MELILLA: ((8, 11), (15, 19), (23, 24)),
+}
+# Ceuta uses the postal codes 51xxx and Melilla the 52xxx. The city name is a
+# fallback for a supply with no postal code.
+CEUTA_MELILLA_POSTAL = ("51", "52")
+CEUTA_MELILLA_CITIES = ("ceuta", "melilla")
 
 # This tool only knows the 2.0TD tariff (three periods: P1, P2, P3).
 SUPPORTED_TARIFF = "2.0"
@@ -534,13 +557,34 @@ class Client:
 
 
 # ---------------------------------------------------------------- parsing
-def tariff_period(day, hour):
-    """Return P1, P2 or P3 for a date and a clock hour, on the 2.0TD tariff."""
+def supply_zone(supply):
+    """Return the 2.0TD zone of a supply.
+
+    Ceuta uses the postal codes 51xxx and Melilla the 52xxx. When the postal
+    code is not there, look at the name of the city. Every other supply uses the
+    hours of the Peninsula, the Balearic Islands and the Canary Islands.
+    """
+    postal = re.sub(r"\D", "", str(supply.get("postal_code") or ""))
+    if postal.startswith(CEUTA_MELILLA_POSTAL):
+        return ZONE_CEUTA_MELILLA
+    city = str(supply.get("city") or "").strip().lower()
+    if any(name in city for name in CEUTA_MELILLA_CITIES):
+        return ZONE_CEUTA_MELILLA
+    return ZONE_PENINSULA
+
+
+def in_hour_windows(hour, windows):
+    """Say if a clock hour is in one of the (start, end) windows."""
+    return any(start <= hour < end for start, end in windows)
+
+
+def tariff_period(day, hour, zone=ZONE_PENINSULA):
+    """Return P1, P2 or P3 for a date, a clock hour and a 2.0TD zone."""
     if day.weekday() >= 5 or (day.month, day.day) in FIXED_HOLIDAYS:
         return "P3"
-    if 10 <= hour < 14 or 18 <= hour < 22:
+    if in_hour_windows(hour, ZONE_PEAK_HOURS[zone]):
         return "P1"
-    if 8 <= hour < 10 or 14 <= hour < 18 or 22 <= hour < 24:
+    if in_hour_windows(hour, ZONE_FLAT_HOURS[zone]):
         return "P2"
     return "P3"
 
@@ -979,7 +1023,7 @@ def fetch_hours(client, account, contracts, listing, wait_seconds=ZIP_WAIT_LIMIT
     return hours
 
 
-def aggregate(hours):
+def aggregate(hours, zone=ZONE_PENINSULA):
     """Build the consumption aggregates from {(day, hour): (kwh, real)}."""
     groups = {"year": {}, "month": {}, "hour": {}}
     periods_real = {"P1": 0.0, "P2": 0.0, "P3": 0.0}
@@ -1010,7 +1054,7 @@ def aggregate(hours):
         if day in pending_days:
             continue
         hour_key = "%02d" % hour
-        period = tariff_period(day, hour)
+        period = tariff_period(day, hour, zone)
         for group, gkey in (("year", "%04d" % day.year),
                             ("month", "%04d-%02d" % (day.year, day.month)),
                             ("hour", hour_key)):
@@ -1067,9 +1111,10 @@ def aggregate(hours):
 
 
 def collect_consumption(client, account, contracts, listing, wait_seconds=ZIP_WAIT_LIMIT,
-                        keep_artifacts=False):
+                        keep_artifacts=False, zone=ZONE_PENINSULA):
     """Download the history and return the aggregates."""
-    return aggregate(fetch_hours(client, account, contracts, listing, wait_seconds, keep_artifacts))
+    return aggregate(fetch_hours(client, account, contracts, listing, wait_seconds, keep_artifacts),
+                     zone)
 
 
 def _groups_list(group_dict):
@@ -1188,6 +1233,7 @@ def _print_report(result, titled=True):
         print("REPORT")
         print("CUPS:", result["cups"])
     print("Tariff:", result["tariff"])
+    print("Zone:", ZONE_LABELS.get(result["zone"], result["zone"]))
     print("Contracted power:", power_txt or "-")
     print("Period:", result["from"], "->", result["to"])
     print()
@@ -1281,16 +1327,20 @@ def _print_report(result, titled=True):
         print("No estimated data. All the data is real.")
 
 
-def _build_report(client, account, cups, group, listing, wait_seconds, keep_artifacts):
+def _build_report(client, account, cups, group, listing, wait_seconds, keep_artifacts,
+                  zone=None):
     """Build the report of one CUPS. Return None when the CUPS has no data."""
     visibility = account["visibility_id"]
     current = next((item for item in group if not item.get("end")), group[-1])
+    zone = zone or supply_zone(current)
+    log("Zone: %s" % ZONE_LABELS.get(zone, zone))
     log("Reading the tariff...")
     tariff = measure_tariff(listing, group)
     if tariff and not tariff.startswith(SUPPORTED_TARIFF):
         raise RuntimeError("Unsupported tariff: %s. This tool supports 2.0TD only."
                            % tariff)
-    data = collect_consumption(client, account, group, listing, wait_seconds, keep_artifacts)
+    data = collect_consumption(client, account, group, listing, wait_seconds, keep_artifacts,
+                               zone)
     if not data["from"]:
         log("  No data for this CUPS.")
         return None
@@ -1314,6 +1364,7 @@ def _build_report(client, account, cups, group, listing, wait_seconds, keep_arti
     return {
         "cups": cups,
         "tariff": tariff,
+        "zone": zone,
         "contracted_power_kw": contracted,
         "from": data["from"].isoformat(),
         "to": data["to"].isoformat(),
@@ -1355,12 +1406,15 @@ def _build_report(client, account, cups, group, listing, wait_seconds, keep_arti
 def cmd_report(args):
     client, account, supplies, listing = load_context(args)
     names = sorted({item["cups"] for item in supplies if item["cups"]})
+    zone = args.zone
+    if zone == "ceuta-melilla":
+        zone = ZONE_CEUTA_MELILLA
     reports = []
     for cups in names:
         log("CUPS %s" % cups)
         group = [item for item in supplies if item["cups"] == cups]
         result = _build_report(client, account, cups, group, listing, args.wait,
-                               args.keep_artifacts)
+                               args.keep_artifacts, zone)
         if result:
             reports.append(result)
     if not reports:
@@ -1398,6 +1452,8 @@ def build_parser():
                         help="keep the zip and the notification on the portal")
     parser.add_argument("--quiet", action="store_true", help="do not print the progress")
     parser.add_argument("--verbose", action="store_true", help="print more detail")
+    parser.add_argument("--zone", choices=["peninsula", "ceuta-melilla"], default=None,
+                        help="2.0TD zone (default: from the postal code of the supply)")
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--session", default=argparse.SUPPRESS)
     common.add_argument("--sid", default=argparse.SUPPRESS)
@@ -1405,6 +1461,8 @@ def build_parser():
     common.add_argument("--keep-artifacts", action="store_true", default=argparse.SUPPRESS)
     common.add_argument("--quiet", action="store_true", default=argparse.SUPPRESS)
     common.add_argument("--verbose", action="store_true", default=argparse.SUPPRESS)
+    common.add_argument("--zone", choices=["peninsula", "ceuta-melilla"],
+                        default=argparse.SUPPRESS)
     sub = parser.add_subparsers(dest="command", required=True)
 
     session_cmd = sub.add_parser("set-session", parents=[common],

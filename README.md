@@ -8,6 +8,8 @@ It gives one thing: a **full report**. The report uses all the data available
 and covers every CUPS of the account, one after another. Each report contains:
 
 - the tariff of the supply,
+- the zone of the supply (the Peninsula, Baleares and Canarias hours, or the
+  Ceuta and Melilla hours),
 - the contracted power per period (P1, P2),
 - the real and estimated consumption totals and the split by P1, P2, P3,
 - the real and estimated consumption by year (with the P1, P2, P3 split),
@@ -80,6 +82,9 @@ The tool has these options. They work with every command:
 - `--keep-artifacts` keeps the zip file and the portal notification (see below).
 - `--quiet` hides the progress lines.
 - `--verbose` shows more detail, such as the token refresh.
+- `--zone ZONE` sets the 2.0TD zone: `peninsula` or `ceuta-melilla`. Without it,
+  the tool reads the postal code of the supply (51xxx is Ceuta, 52xxx is
+  Melilla).
 
 Add them before or after the command.
 
@@ -108,6 +113,7 @@ Example output:
 REPORT
 CUPS: ES0031100000000000NN0N
 Tariff: 2.0TD
+Zone: Peninsula, Baleares and Canarias
 Contracted power: P1 4.0 kW, P2 4.0 kW
 Period: 2024-01-16 -> 2026-09-12
 
@@ -161,7 +167,7 @@ READING MAP (R real, E estimated, M mixed, . no data)
 
 The tool asks the portal for one zip with the hourly curves and reads it. Then
 it deletes the zip from the portal. The period (P1, P2, P3) is worked out from
-the 2.0TD calendar. All the details are in
+the 2.0TD calendar and the zone of the supply. All the details are in
 [docs/TARIFF_2_0TD.md](docs/TARIFF_2_0TD.md).
 
 The Aura protocol, the browserless login and the download flow have diagrams in
@@ -188,6 +194,13 @@ pytest            # tests (no network)
 The tests cover the pure logic only: the 2.0TD periods, the zip read, the day
 status, the reading map and the aggregation. They need no session and no
 network.
+
+## Acknowledgements
+
+- The 2.0TD calculation was checked against
+  [luzfija.es](https://github.com/almax-es/luzfija.es). The period rules of that
+  project, and its 2026 grid fee and charge values, helped to confirm the
+  calculation of this tool.
 
 ## Security
 

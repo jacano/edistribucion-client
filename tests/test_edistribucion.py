@@ -40,6 +40,32 @@ def test_tariff_period_easter_is_not_off_peak():
     assert ed.tariff_period(date(2024, 3, 29), 12) == "P1"  # Good Friday
 
 
+def test_tariff_period_ceuta_melilla():
+    friday = date(2026, 1, 2)
+    zone = ed.ZONE_CEUTA_MELILLA
+    assert ed.tariff_period(friday, 12, zone) == "P1"   # 11-15 is peak
+    assert ed.tariff_period(friday, 20, zone) == "P1"   # 19-23 is peak
+    assert ed.tariff_period(friday, 10, zone) == "P2"   # 8-11 is flat
+    assert ed.tariff_period(friday, 15, zone) == "P2"   # 15-19 is flat
+    assert ed.tariff_period(friday, 7, zone) == "P3"    # 0-8 is off-peak
+    assert ed.tariff_period(date(2026, 1, 3), 12, zone) == "P3"   # Saturday
+    assert ed.tariff_period(date(2026, 1, 1), 20, zone) == "P3"   # fixed holiday
+
+
+def test_supply_zone_from_postal_code():
+    assert ed.supply_zone({"postal_code": "51001"}) == ed.ZONE_CEUTA_MELILLA
+    assert ed.supply_zone({"postal_code": "52002"}) == ed.ZONE_CEUTA_MELILLA
+    assert ed.supply_zone({"postal_code": "28001"}) == ed.ZONE_PENINSULA
+    assert ed.supply_zone({"postal_code": "08001"}) == ed.ZONE_PENINSULA
+
+
+def test_supply_zone_from_city():
+    assert ed.supply_zone({"city": "Ceuta"}) == ed.ZONE_CEUTA_MELILLA
+    assert ed.supply_zone({"city": "Melilla"}) == ed.ZONE_CEUTA_MELILLA
+    assert ed.supply_zone({"city": "Madrid"}) == ed.ZONE_PENINSULA
+    assert ed.supply_zone({}) == ed.ZONE_PENINSULA
+
+
 # ------------------------------------------------------------------- clock_hour
 def test_clock_hour_normal_day():
     assert ed.clock_hour(24, 1) == 0
@@ -148,6 +174,12 @@ def test_aggregate_ignores_pending_days():
     assert result["from"] is None
     assert result["real_kwh"] == 0.0
     assert result["estimated_kwh"] == 0.0
+
+
+def test_aggregate_uses_the_zone():
+    hours = {(date(2026, 1, 2), 14): (1.0, True)}   # Friday, 14:00-15:00
+    assert ed.aggregate(hours)["periods_real_kwh"]["P2"] == 1.0
+    assert ed.aggregate(hours, ed.ZONE_CEUTA_MELILLA)["periods_real_kwh"]["P1"] == 1.0
 
 
 # ---------------------------------------------------------------- measure_tariff

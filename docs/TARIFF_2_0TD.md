@@ -15,6 +15,10 @@ command.
 
 ## The three periods
 
+The hours depend on the zone. This table is the set of the Peninsula, the
+Balearic Islands and the Canary Islands. Ceuta and Melilla use another set; see
+the section "The zone" below.
+
 | Period | Name | Hours (Monday to Friday) |
 | ------ | ---- | ------------------------ |
 | P1 | Peak (punta) | 10:00-14:00 and 18:00-22:00 |
@@ -95,32 +99,65 @@ The law gives two sets of hours:
 - Ceuta and Melilla: P1 11 h-15 h and 19 h-23 h, P2 8 h-11 h, 15 h-19 h and
   23 h-24 h, P3 0 h-8 h.
 
-This tool uses the hours of the Peninsula, Balearic Islands and Canary Islands.
+This tool uses the set of hours of the zone of the supply. The next section
+explains the zone.
 
 The link to the law: <https://www.boe.es/buscar/act.php?id=BOE-A-2020-1066>
 (Article 7, point 3).
 
+## The zone
+
+The period hours are not the same in the whole country. The law gives two sets:
+
+- the Peninsula, the Balearic Islands and the Canary Islands,
+- Ceuta and Melilla, whose hours are one hour later.
+
+The tool works out the zone of each supply from the postal code:
+
+- 51xxx is Ceuta,
+- 52xxx is Melilla,
+- any other code is the Peninsula, the Balearic Islands or the Canary Islands.
+
+When the portal gives no postal code, the tool looks at the name of the city.
+When there is no postal code and no city, the tool uses the hours of the
+Peninsula. Add `--zone ceuta-melilla` to set the zone by hand.
+
 ## How the tool works out the period
 
-The tool uses this function. The input is the date and the start hour of the
-hour. The start hour is a number from 0 to 23.
+The tool uses this function. The input is the date, the start hour of the hour
+(a number from 0 to 23) and the zone.
 
 ```python
 FIXED_HOLIDAYS = {(1, 1), (1, 6), (5, 1), (8, 15), (10, 12), (11, 1), (12, 6), (12, 8), (12, 25)}
 
+ZONE_PEAK_HOURS = {
+    "peninsula": ((10, 14), (18, 22)),
+    "ceuta_melilla": ((11, 15), (19, 23)),
+}
+ZONE_FLAT_HOURS = {
+    "peninsula": ((8, 10), (14, 18), (22, 24)),
+    "ceuta_melilla": ((8, 11), (15, 19), (23, 24)),
+}
 
-def tariff_period(day, hour):
-    """Return P1, P2 or P3 for a date and a clock hour, on the 2.0TD tariff."""
+
+def in_hour_windows(hour, windows):
+    """Say if a clock hour is in one of the (start, end) windows."""
+    return any(start <= hour < end for start, end in windows)
+
+
+def tariff_period(day, hour, zone="peninsula"):
+    """Return P1, P2 or P3 for a date, a clock hour and a 2.0TD zone."""
     if day.weekday() >= 5 or (day.month, day.day) in FIXED_HOLIDAYS:
         return "P3"
-    if 10 <= hour < 14 or 18 <= hour < 22:
+    if in_hour_windows(hour, ZONE_PEAK_HOURS[zone]):
         return "P1"
-    if 8 <= hour < 10 or 14 <= hour < 18 or 22 <= hour < 24:
+    if in_hour_windows(hour, ZONE_FLAT_HOURS[zone]):
         return "P2"
     return "P3"
 ```
 
-`day.weekday()` is 5 for a Saturday and 6 for a Sunday.
+`day.weekday()` is 5 for a Saturday and 6 for a Sunday. The weekend and a fixed
+national holiday are P3 in every zone.
 
 ## Change of the hour (DST)
 
@@ -145,3 +182,7 @@ def tariff_period(day, hour):
 
 - Circular 3/2020 of the CNMC, Article 7, BOE-A-2020-1066:
   <https://www.boe.es/buscar/act.php?id=BOE-A-2020-1066>
+- The 2.0TD calculation was checked against the free project
+  [luzfija.es](https://github.com/almax-es/luzfija.es). Its period rules and its
+  2026 grid fee and charge values helped to confirm the calculation of this
+  tool.

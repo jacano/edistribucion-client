@@ -11,9 +11,13 @@ tool was built and tested with one real 2.0TD account.
 
 ## Zone
 
-- The period hours are the ones of the Peninsula, Balearic Islands and Canary
-  Islands.
-- Ceuta and Melilla use other hours, so the period split can be wrong there.
+- The tool detects the zone of each supply. The Peninsula, the Balearic Islands
+  and the Canary Islands share one set of hours. Ceuta and Melilla share the
+  other set, one hour later.
+- The tool reads the postal code of the supply (51xxx is Ceuta, 52xxx is
+  Melilla) and, when it is not there, the name of the city.
+- When the portal gives no postal code and no city, the tool uses the hours of
+  the Peninsula. Add `--zone ceuta-melilla` in that case.
 
 ## Environment
 

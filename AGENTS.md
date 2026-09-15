@@ -39,8 +39,8 @@ This file tells an LLM agent what this tool is and how to use it.
 | `edistribucion import-cookies` | import a cookies.txt |
 | `edistribucion set-session --sid` | store a session value by hand |
 
-The options `--sid`, `--session`, `--wait`, `--keep-artifacts`, `--quiet` and `--verbose`
-go before or after the command.
+The options `--sid`, `--session`, `--wait`, `--keep-artifacts`, `--quiet`,
+`--verbose` and `--zone` go before or after the command.
 
 ## report
 
@@ -74,8 +74,9 @@ goes to stdout. So `--json` stays correct when you capture the output.
 The tool asks the portal for one zip with the hourly curves (action
 `createZip`), waits for it, and reads it. The portal also makes a notification.
 Then the tool deletes the zip and the notification. Add `--keep-artifacts` to keep both
-on the portal. The period (P1, P2, P3) comes from the 2.0TD calendar, not from a
-data call.
+on the portal. The period (P1, P2, P3) comes from the 2.0TD calendar and the
+zone of the supply, not from a data call. The zone comes from the postal code
+(51xxx is Ceuta, 52xxx is Melilla); `--zone` sets it by hand.
 
 The tool does not use the per-range API `getChartPointsByRange`: it covers only
 about 35 days per call, so the full history needs many calls and does not scale.
