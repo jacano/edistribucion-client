@@ -182,9 +182,9 @@ MAXIMUM PER YEAR
 
 MAXIMUM DEMANDED POWER (kW, 15 minute measure)
   The contract has one power for P1 and one power for P2.
-  Year   P1         When                    P2         When
-  2024   4.756 kW   28-10-2024 22:15        3.936 kW   08-09-2024 21:15
-  2025   5.024 kW   20-02-2025 21:45        4.936 kW   23-03-2025 12:15
+  Year           P1  When                         P2  When
+  2024     4.756 kW  28-10-2024 22:15       3.936 kW  08-09-2024 21:15
+  2025     5.024 kW  20-02-2025 21:45       4.936 kW  23-03-2025 12:15
   The portal does not return every month.
   No month above the contracted power.
 
