@@ -125,10 +125,29 @@ FIXED_HOLIDAYS = {(1, 1), (1, 6), (5, 1), (8, 15), (10, 12), (11, 1), (12, 6), (
 # This tool only knows the 2.0TD tariff (three periods: P1, P2, P3).
 SUPPORTED_TARIFF = "2.0"
 
+# HTTP and download settings.
+HTTP_TIMEOUT = 40
+DOWNLOAD_TIMEOUT = 90
+DOWNLOAD_TYPE = 1                    # 1 = hourly curves
+FILE_TYPES = ["01", "50", "51"]      # the portal file types to list
+ZIP_WAIT_SECONDS = 3                 # seconds between two checks
+ZIP_WAIT_LIMIT = 180                 # seconds to wait for the zip
+
+
+_QUIET = False
+_VERBOSE = False
+
 
 def log(message):
     """Write a progress line to stderr, so stdout stays clean."""
-    print(message, file=sys.stderr)
+    if not _QUIET:
+        print(message, file=sys.stderr)
+
+
+def debug(message):
+    """Write a detail line, only with --verbose."""
+    if _VERBOSE and not _QUIET:
+        print(message, file=sys.stderr)
 
 
 # ---------------------------------------------------------------- session/HTTP
@@ -142,7 +161,7 @@ class Session:
             try:
                 data = json.load(open(path, encoding="utf-8"))
                 self.cookies = data.get("cookies", {})
-            except Exception:
+            except (OSError, json.JSONDecodeError):
                 pass
         if sid:
             self.cookies["sid"] = sid
@@ -288,9 +307,10 @@ def _jar_sid(jar):
 
 
 def _fetch(opener, url):
-    with opener.open(urllib.request.Request(
-            url, headers={"User-Agent": USER_AGENT,
-                          "Accept": "text/html,application/xhtml+xml"}), timeout=40) as response:
+    request = urllib.request.Request(
+        url, headers={"User-Agent": USER_AGENT,
+                      "Accept": "text/html,application/xhtml+xml"})
+    with opener.open(request, timeout=HTTP_TIMEOUT) as response:
         return response.read().decode("utf-8", "replace")
 
 
@@ -311,7 +331,7 @@ def portal_login(username, password, start_url=""):
     request = urllib.request.Request(
         BASE + page_uri,
         headers={"User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml"})
-    with opener.open(request, timeout=40) as response:
+    with opener.open(request, timeout=HTTP_TIMEOUT) as response:
         response.read()
 
     message = {"actions": [{"id": "1;a",
@@ -329,7 +349,7 @@ def portal_login(username, password, start_url=""):
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
             "Origin": BASE, "Referer": BASE + page_uri,
             "User-Agent": USER_AGENT, "Accept": "*/*"})
-    with opener.open(request, timeout=40) as response:
+    with opener.open(request, timeout=HTTP_TIMEOUT) as response:
         text = response.read().decode("utf-8", "replace")
 
     sid = _jar_sid(jar)
@@ -349,13 +369,13 @@ def portal_login(username, password, start_url=""):
                 flow = re.search(r"(?:https://[^\"']+)?(/areaprivada/loginflow/[^\"'\\ ]+)", body)
                 if flow:
                     _fetch(opener, BASE + flow.group(1))
-            except Exception:
+            except (urllib.error.URLError, OSError):
                 pass
             sid = _jar_sid(jar)
         if sid:
             try:
                 _fetch(opener, BASE + HOME_PAGE)
-            except Exception:
+            except (urllib.error.URLError, OSError):
                 pass
     return sid, text
 
@@ -364,6 +384,8 @@ class Client:
     def __init__(self, session):
         self.session = session
         self._tokens = {}
+        self.fwuid = FWUID
+        self.app_version = APP_VERSION
 
     # --- low level HTTP ---
     def _request(self, method, url, data=None, extra_headers=None):
@@ -374,16 +396,28 @@ class Client:
             headers.update(extra_headers)
         request = urllib.request.Request(url, data=data, method=method, headers=headers)
         try:
-            with urllib.request.urlopen(request, timeout=40) as response:
+            with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT) as response:
                 return response.status, response.headers, response.read().decode("utf-8", "replace")
         except urllib.error.HTTPError as exc:
             return exc.code, exc.headers, exc.read().decode("utf-8", "replace")
+
+    def _read_context(self, text):
+        """Refresh fwuid and app version from an Aura response context."""
+        try:
+            context = json.loads(text).get("context") or {}
+        except json.JSONDecodeError:
+            return
+        if context.get("fwuid"):
+            self.fwuid = context["fwuid"]
+        for key, value in (context.get("loaded") or {}).items():
+            if key.startswith("APPLICATION@markup://siteforce:communityApp"):
+                self.app_version = value
 
     # --- anti-CSRF token delivered via Set-Cookie ---
     def token(self, page_uri, force=False):
         if not force and page_uri in self._tokens:
             return self._tokens[page_uri]
-        log("  token: GET %s" % page_uri)
+        debug("  token: GET %s" % page_uri)
         status, headers, _ = self._request(
             "GET", BASE + page_uri,
             extra_headers={"Accept": "text/html,application/xhtml+xml"})
@@ -405,9 +439,11 @@ class Client:
         message = json.dumps({"actions": [{"id": "1;a", "descriptor": descriptor,
                                            "callingDescriptor": calling, "params": params}]},
                              separators=(",", ":"))
-        context = json.dumps({"mode": "PROD", "fwuid": FWUID, "app": "siteforce:communityApp",
-                              "loaded": {"APPLICATION@markup://siteforce:communityApp": APP_VERSION},
-                              "dn": [], "globals": {}, "uad": True}, separators=(",", ":"))
+        loaded = {"APPLICATION@markup://siteforce:communityApp": self.app_version}
+        context = json.dumps(
+            {"mode": "PROD", "fwuid": self.fwuid, "app": "siteforce:communityApp",
+             "loaded": loaded, "dn": [], "globals": {}, "uad": True},
+            separators=(",", ":"))
         body = urllib.parse.urlencode({"message": message, "aura.context": context,
                                        "aura.pageURI": page_uri, "aura.token": token}).encode()
         status, _, text = self._request(
@@ -420,11 +456,13 @@ class Client:
             return self.call(action, params, page_uri, retry=False)
         try:
             payload = json.loads(text)
-        except Exception:
-            raise RuntimeError("Non-JSON response: " + text[:200])
+        except json.JSONDecodeError:
+            raise RuntimeError("Non-JSON response: " + text[:200]) from None
+        self._read_context(text)
         result = (payload.get("actions") or [{}])[0]
         if result.get("state") != "SUCCESS":
-            raise RuntimeError("Aura error (%s): %s" % (action, result.get("error") or result.get("state")))
+            raise RuntimeError(
+                "Aura error (%s): %s" % (action, result.get("error") or result.get("state")))
         return result.get("returnValue")
 
     # --- high level API ---
@@ -464,18 +502,19 @@ class Client:
 
     def get_info(self, contract_id, visibility_id):
         page = "%s?aId=%s&vis=%s" % (DETAIL_PAGE, contract_id, visibility_id)
-        return self.call("get_info", {"contId": contract_id, "visId": visibility_id}, page).get("data", {})
+        params = {"contId": contract_id, "visId": visibility_id}
+        return self.call("get_info", params, page).get("data", {})
 
     def list_measure_cups(self, visibility_id):
         return self.call("measure_list", {"sIdentificador": visibility_id}, DOWNLOAD_PAGE)
 
     def create_zip(self, visibility_id, contract_ids, contracts, start_date, end_date):
         params = {"roleId": visibility_id, "lstCupsIds": contract_ids, "data": contracts,
-                  "startDate": start_date, "endDate": end_date, "downloadType": 1}
+                  "startDate": start_date, "endDate": end_date, "downloadType": DOWNLOAD_TYPE}
         return self.call("create_zip", params, DOWNLOAD_PAGE)
 
     def get_files(self, visibility_id):
-        params = {"roleId": visibility_id, "type": ["01", "50", "51"]}
+        params = {"roleId": visibility_id, "type": FILE_TYPES}
         return self.call("get_files", params, DOWNLOAD_PAGE).get("data", {})
 
     def delete_file(self, transfer_id):
@@ -488,7 +527,7 @@ class Client:
         if self.session.sid:
             headers["Cookie"] = self.session.cookie_header()
         request = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(request, timeout=90) as response:
+        with urllib.request.urlopen(request, timeout=DOWNLOAD_TIMEOUT) as response:
             return response.read()
 
     def get_maximeter(self, cups_id, visibility_id, start_date, end_date):
@@ -527,12 +566,27 @@ def tariff_period(day, hour):
     return "P3"
 
 
-def zip_hours(payload):
-    """Yield (day, hour, kwh, real) from the hourly CSV files in the zip.
+def clock_hour(count, index):
+    """Map the row index of a day (1 based) to the clock hour (0 to 23).
 
-    The Hora column counts the hours of the day, so a day of the change of the
-    hour has 23 or 25 rows. The change is always in a Sunday (all P3), so the
-    exact hour does not change the period.
+    The `Hora` column counts the rows of the day. A day of the change of the
+    hour has 23 rows (spring) or 25 rows (autumn), not 24. The change is on a
+    Sunday, so the hour does not change the period.
+    """
+    if count == 23 and index >= 3:
+        hour = index
+    elif count == 25 and index >= 4:
+        hour = index - 2
+    else:
+        hour = index - 1
+    return min(hour, 23)
+
+
+def read_zip_rows(payload):
+    """Return the rows of the hourly CSV files in the zip.
+
+    Each row is (day, index, count, kwh, real). `index` counts from 1 inside
+    the day. `count` is the number of rows of that day.
     """
     days = {}
     order = []
@@ -564,17 +618,19 @@ def zip_hours(payload):
                         days[day] = []
                         order.append(day)
                     days[day].append((kwh, row[i_flag].strip().upper().startswith("R")))
+    rows = []
     for day in order:
-        rows = days[day]
-        count = len(rows)
-        for index, (kwh, real) in enumerate(rows, start=1):
-            if count == 23 and index >= 3:
-                hour = index
-            elif count == 25 and index >= 4:
-                hour = index - 2
-            else:
-                hour = index - 1
-            yield day, min(hour, 23), kwh, real
+        day_rows = days[day]
+        count = len(day_rows)
+        for index, (kwh, real) in enumerate(day_rows, start=1):
+            rows.append((day, index, count, kwh, real))
+    return rows
+
+
+def zip_hours(payload):
+    """Yield (day, hour, kwh, real) from the hourly CSV files in the zip."""
+    for day, index, count, kwh, real in read_zip_rows(payload):
+        yield day, clock_hour(count, index), kwh, real
 
 
 def parse_cookies_file(path, domain=None):
@@ -660,8 +716,7 @@ def auto_login(args):
         return None
     session = Session(sid=sid, path=args.session)
     session.save()
-    print("Stored session expired. Logged in again with the stored credentials.",
-          file=sys.stderr)
+    log("Stored session expired. Logged in again with the stored credentials.")
     return Client(session)
 
 
@@ -670,12 +725,12 @@ def load_context(args):
     log("Checking the session...")
     try:
         account = client.whoami()
-    except Exception:
+    except (RuntimeError, urllib.error.URLError):
         account = None
         try:
             client = auto_login(args) or client
             account = client.whoami() if client is not None else None
-        except Exception:
+        except (RuntimeError, urllib.error.URLError, OSError):
             account = None
         if account is None:
             raise
@@ -707,7 +762,7 @@ def cmd_set_session(args):
     try:
         account = Client(session).whoami()
         print("Login OK. User:", account["name"])
-    except Exception as exc:
+    except (RuntimeError, urllib.error.URLError) as exc:
         print("Session saved, but the check failed:", exc, file=sys.stderr)
         sys.exit(1)
 
@@ -730,7 +785,7 @@ def cmd_import_cookies(args):
     try:
         account = Client(session).whoami()
         print("Login OK. User:", account["name"])
-    except Exception as exc:
+    except (RuntimeError, urllib.error.URLError) as exc:
         print("Session saved, but the check failed:", exc, file=sys.stderr)
         sys.exit(1)
 
@@ -764,7 +819,7 @@ def cmd_login(args):
     print("Logging in by backend...")
     try:
         sid, text = portal_login(username, password)
-    except Exception as exc:
+    except (RuntimeError, urllib.error.URLError, OSError) as exc:
         print("Login request failed:", exc, file=sys.stderr)
         sys.exit(1)
     if not sid:
@@ -781,7 +836,7 @@ def cmd_login(args):
     try:
         account = Client(session).whoami()
         print("Login OK. User:", account["name"])
-    except Exception as exc:
+    except (RuntimeError, urllib.error.URLError) as exc:
         print("Session saved, but the check failed:", exc, file=sys.stderr)
         sys.exit(1)
 
@@ -795,7 +850,7 @@ def measure_tariff(listing, contracts):
     return None
 
 
-def _download_measure_zip(client, account, contracts, listing):
+def _download_measure_zip(client, account, contracts, listing, wait_seconds):
     """Ask the portal for one zip with all the hourly curves of a CUPS.
 
     The portal makes the zip in the background. This waits until the file
@@ -815,9 +870,11 @@ def _download_measure_zip(client, account, contracts, listing):
     known = {item.get("fileid") for item in (client.get_files(visibility).get("lstFiles") or [])}
     log("Requesting the zip (%s -> %s). The portal makes it in the background." % (start, end))
     client.create_zip(visibility, contract_ids, records, start, end)
-    for attempt in range(60):
-        time.sleep(3)
-        log("  Waiting for the zip... %d s" % ((attempt + 1) * 3))
+    attempts = max(1, wait_seconds // ZIP_WAIT_SECONDS)
+    for attempt in range(attempts):
+        time.sleep(ZIP_WAIT_SECONDS)
+        waited = (attempt + 1) * ZIP_WAIT_SECONDS
+        log("  Waiting for the zip... %d s" % waited)
         files = client.get_files(visibility).get("lstFiles") or []
         fresh = [item for item in files if item.get("fileid") not in known]
         if fresh:
@@ -829,14 +886,28 @@ def _download_measure_zip(client, account, contracts, listing):
             try:
                 client.delete_file(fresh[0]["Id"])
                 log("Zip deleted.")
-            except Exception as exc:
+            except (RuntimeError, urllib.error.URLError) as exc:
                 log("Could not delete the zip: %s" % exc)
             return payload
-    raise RuntimeError("The portal did not make the zip in time.")
+    raise RuntimeError("The portal did not make the zip in time (%d s)." % wait_seconds)
 
 
-def collect_consumption(client, account, contracts, listing):
-    """Read the full history from the zip and return the aggregates."""
+def fetch_hours(client, account, contracts, listing, wait_seconds=ZIP_WAIT_LIMIT):
+    """Download the zip and return {(day, hour): (kwh, real)}."""
+    payload = _download_measure_zip(client, account, contracts, listing, wait_seconds)
+    hours = {}
+    if payload:
+        for day, hour, kwh, real in zip_hours(payload):
+            key = (day, hour)
+            old = hours.get(key)
+            if old is None or (real and not old[1]):
+                hours[key] = (kwh, real)
+    log("Read %d hours from the zip." % len(hours))
+    return hours
+
+
+def aggregate(hours):
+    """Build the consumption aggregates from {(day, hour): (kwh, real)}."""
     groups = {"year": {}, "month": {}, "hour": {}}
     periods_real = {"P1": 0.0, "P2": 0.0, "P3": 0.0}
     periods_estimated = {"P1": 0.0, "P2": 0.0, "P3": 0.0}
@@ -848,21 +919,11 @@ def collect_consumption(client, account, contracts, listing):
     month_peak = {}
     first = last = None
     last_real = None
-    hours = {}
     day_counts = {}
 
     def bucket(group, key):
         return groups[group].setdefault(key, {"real_kwh": 0.0, "estimated_kwh": 0.0,
                                               "real_hours": 0, "estimated_hours": 0})
-
-    payload = _download_measure_zip(client, account, contracts, listing)
-    if payload:
-        for day, hour, kwh, real in zip_hours(payload):
-            key = (day, hour)
-            old = hours.get(key)
-            if old is None or (real and not old[1]):
-                hours[key] = (kwh, real)
-    log("Read %d hours from the zip." % len(hours))
 
     # The status of each day, for the recent zoom. This keeps the pending days.
     for (day, _hour), (kwh, real) in hours.items():
@@ -932,6 +993,11 @@ def collect_consumption(client, account, contracts, listing):
     }
 
 
+def collect_consumption(client, account, contracts, listing, wait_seconds=ZIP_WAIT_LIMIT):
+    """Download the history and return the aggregates."""
+    return aggregate(fetch_hours(client, account, contracts, listing, wait_seconds))
+
+
 def _groups_list(group_dict):
     return [{
         "key": key,
@@ -946,7 +1012,8 @@ def _max_demand(client, account, cups_id, year_from, year_to):
     """Return the maximum demanded power per month, with the date and the hour."""
     monthly = {}
     for year in range(year_from, year_to + 1):
-        data = client.get_maximeter(cups_id, account["visibility_id"], "1/%d" % year, "12/%d" % year)
+        data = client.get_maximeter(
+            cups_id, account["visibility_id"], "1/%d" % year, "12/%d" % year)
         for point in data.get("lstData", []):
             if not point.get("valid"):
                 continue
@@ -1140,82 +1207,89 @@ def _print_report(result, titled=True):
         print("No estimated data. All the data is real.")
 
 
+def _build_report(client, account, cups, group, listing, wait_seconds):
+    """Build the report of one CUPS. Return None when the CUPS has no data."""
+    visibility = account["visibility_id"]
+    current = next((item for item in group if not item.get("end")), group[-1])
+    log("Reading the tariff...")
+    tariff = measure_tariff(listing, group)
+    if tariff and not tariff.startswith(SUPPORTED_TARIFF):
+        raise RuntimeError("Unsupported tariff: %s. This tool supports 2.0TD only."
+                           % tariff)
+    data = collect_consumption(client, account, group, listing, wait_seconds)
+    if not data["from"]:
+        log("  No data for this CUPS.")
+        return None
+    log("Reading the contracted power...")
+    contracted = client.get_contracted_power(current["contract_id"], visibility)
+    log("Reading the maximum demanded power (%d-%d)..."
+        % (data["from"].year, data["to"].year))
+    monthly_power = _max_demand(client, account, current["cups_id"],
+                                data["from"].year, data["to"].year)
+    year_power = {}
+    for month_key, info in monthly_power.items():
+        year = int(month_key.split("-")[0])
+        if year not in year_power or info["kw"] > year_power[year]["kw"]:
+            year_power[year] = info
+    counts = data["day_counts"]
+    window_end = max(counts) if counts else data["to"]
+    today = date.today()
+    last_value = max((day for day, value in counts.items() if value["kwh"] > 0),
+                     default=None)
+    ranges = recent_ranges(counts, window_end)
+    return {
+        "cups": cups,
+        "tariff": tariff,
+        "contracted_power_kw": contracted,
+        "from": data["from"].isoformat(),
+        "to": data["to"].isoformat(),
+        "last_real": data["last_real"].isoformat() if data["last_real"] else None,
+        "recent": {
+            "today": today.isoformat(),
+            "to": window_end.isoformat(),
+            "last_reading": last_value.isoformat() if last_value else None,
+            "last_status": day_status(counts.get(last_value)) if last_value else None,
+            "delay_days": (today - last_value).days if last_value else None,
+            "ranges": [{"from": first.isoformat(), "to": end.isoformat(), "status": status}
+                       for first, end, status in ranges],
+        },
+        "real_kwh": round(data["real_kwh"], 3),
+        "estimated_kwh": round(data["estimated_kwh"], 3),
+        "real_hours": data["real_hours"],
+        "estimated_hours": data["estimated_hours"],
+        "periods_real_kwh": {k: round(v, 3) for k, v in data["periods_real_kwh"].items()},
+        "periods_estimated_kwh": {k: round(v, 3)
+                                  for k, v in data["periods_estimated_kwh"].items()},
+        "periods_by_year": {str(year): {name: {"real": round(slot["real"], 3),
+                                               "estimated": round(slot["estimated"], 3)}
+                                        for name, slot in sorted(periods.items())}
+                            for year, periods in sorted(data["periods_year"].items())},
+        "has_estimated": bool(data["estimated_days"]),
+        "month_map": month_map(counts),
+        "consumption_by_year": _groups_list(data["groups"]["year"]),
+        "consumption_by_month": _groups_list(data["groups"]["month"]),
+        "consumption_by_hour": _groups_list(data["groups"]["hour"]),
+        "max_hourly_by_year": {str(y): {"kwh": round(v[0], 3), "date": v[1], "hour": v[2]}
+                               for y, v in sorted(data["year_peak"].items())},
+        "max_hourly_by_month": {k: {"kwh": round(v[0], 3), "date": v[1], "hour": v[2]}
+                                for k, v in sorted(data["month_peak"].items())},
+        "max_demand_by_year": {str(y): v for y, v in sorted(year_power.items())},
+        "max_demand_by_month": monthly_power,
+    }
+
+
 def cmd_report(args):
     client, account, supplies = load_context(args)
     visibility = account["visibility_id"]
     names = sorted({item["cups"] for item in supplies if item["cups"]})
+    listing = client.list_measure_cups(visibility).get("data") or {}
     reports = []
     for cups in names:
-        group = [item for item in supplies if item["cups"] == cups]
-        current = next((item for item in group if not item.get("end")), group[-1])
         log("CUPS %s" % cups)
-        log("Reading the tariff...")
-        listing = client.list_measure_cups(visibility).get("data") or {}
-        tariff = measure_tariff(listing, group)
-        if tariff and not tariff.startswith(SUPPORTED_TARIFF):
-            raise RuntimeError("Unsupported tariff: %s. This tool supports 2.0TD only."
-                               % tariff)
-        data = collect_consumption(client, account, group, listing)
-        if not data["from"]:
-            log("  No data for this CUPS.")
-            continue
-        log("Reading the contracted power...")
-        contracted = client.get_contracted_power(current["contract_id"], visibility)
-        log("Reading the maximum demanded power (%d-%d)..."
-            % (data["from"].year, data["to"].year))
-        monthly_power = _max_demand(client, account, current["cups_id"],
-                                    data["from"].year, data["to"].year)
-        year_power = {}
-        for month_key, info in monthly_power.items():
-            year = int(month_key.split("-")[0])
-            if year not in year_power or info["kw"] > year_power[year]["kw"]:
-                year_power[year] = info
-        counts = data["day_counts"]
-        window_end = max(counts) if counts else data["to"]
-        today = date.today()
-        last_value = max((day for day, value in counts.items() if value["kwh"] > 0),
-                         default=None)
-        ranges = recent_ranges(counts, window_end)
-        result = {
-            "cups": cups,
-            "tariff": tariff,
-            "contracted_power_kw": contracted,
-            "from": data["from"].isoformat(),
-            "to": data["to"].isoformat(),
-            "last_real": data["last_real"].isoformat() if data["last_real"] else None,
-            "recent": {
-                "today": today.isoformat(),
-                "to": window_end.isoformat(),
-                "last_reading": last_value.isoformat() if last_value else None,
-                "last_status": day_status(counts.get(last_value)) if last_value else None,
-                "delay_days": (today - last_value).days if last_value else None,
-                "ranges": [{"from": first.isoformat(), "to": end.isoformat(), "status": status}
-                           for first, end, status in ranges],
-            },
-            "real_kwh": round(data["real_kwh"], 3),
-            "estimated_kwh": round(data["estimated_kwh"], 3),
-            "real_hours": data["real_hours"],
-            "estimated_hours": data["estimated_hours"],
-            "periods_real_kwh": {k: round(v, 3) for k, v in data["periods_real_kwh"].items()},
-            "periods_estimated_kwh": {k: round(v, 3)
-                                      for k, v in data["periods_estimated_kwh"].items()},
-            "periods_by_year": {str(year): {name: {"real": round(slot["real"], 3),
-                                                   "estimated": round(slot["estimated"], 3)}
-                                            for name, slot in sorted(periods.items())}
-                                for year, periods in sorted(data["periods_year"].items())},
-            "has_estimated": bool(data["estimated_days"]),
-            "month_map": month_map(counts),
-            "consumption_by_year": _groups_list(data["groups"]["year"]),
-            "consumption_by_month": _groups_list(data["groups"]["month"]),
-            "consumption_by_hour": _groups_list(data["groups"]["hour"]),
-            "max_hourly_by_year": {str(y): {"kwh": round(v[0], 3), "date": v[1], "hour": v[2]}
-                                   for y, v in sorted(data["year_peak"].items())},
-            "max_hourly_by_month": {k: {"kwh": round(v[0], 3), "date": v[1], "hour": v[2]}
-                                    for k, v in sorted(data["month_peak"].items())},
-            "max_demand_by_year": {str(y): v for y, v in sorted(year_power.items())},
-            "max_demand_by_month": monthly_power,
-        }
-        reports.append(result)
+        group = [item for item in supplies if item["cups"] == cups]
+        result = _build_report(client, account, cups, group, listing, args.wait)
+        if result:
+            reports.append(result)
     if not reports:
         print("No data.", file=sys.stderr)
         sys.exit(1)
@@ -1237,14 +1311,24 @@ def cmd_report(args):
             _print_report(result)
 
 
+COMMANDS = ("set-session", "import-cookies", "login", "report")
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         description="Unofficial HTTP-only client for e-distribucion (no browser)")
     parser.add_argument("--session", default=DEFAULT_SESSION, help="path to the session file")
     parser.add_argument("--sid", help="value of the sid cookie")
+    parser.add_argument("--wait", type=int, default=ZIP_WAIT_LIMIT,
+                        help="seconds to wait for the portal zip (default %d)" % ZIP_WAIT_LIMIT)
+    parser.add_argument("--quiet", action="store_true", help="do not print the progress")
+    parser.add_argument("--verbose", action="store_true", help="print more detail")
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--session", default=argparse.SUPPRESS)
     common.add_argument("--sid", default=argparse.SUPPRESS)
+    common.add_argument("--wait", type=int, default=argparse.SUPPRESS)
+    common.add_argument("--quiet", action="store_true", default=argparse.SUPPRESS)
+    common.add_argument("--verbose", action="store_true", default=argparse.SUPPRESS)
     sub = parser.add_subparsers(dest="command", required=True)
 
     session_cmd = sub.add_parser("set-session", parents=[common],
@@ -1256,7 +1340,8 @@ def build_parser():
 
     imp = sub.add_parser("import-cookies", parents=[common],
                          help="import cookies from a cookies.txt (Netscape) or JSON file")
-    imp.add_argument("file", nargs="?", help="path to cookies.txt or JSON export (default: newest in Downloads)")
+    imp.add_argument("file", nargs="?",
+                     help="path to cookies.txt or JSON export (default: newest in Downloads)")
     imp.set_defaults(func=cmd_import_cookies)
 
     login_cmd = sub.add_parser("login", parents=[common],
@@ -1278,9 +1363,12 @@ def build_parser():
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv:
-        argv = ["report"]
+    if not any(argument in COMMANDS for argument in argv):
+        argv.append("report")
     args = build_parser().parse_args(argv)
+    global _QUIET, _VERBOSE
+    _QUIET = getattr(args, "quiet", False)
+    _VERBOSE = getattr(args, "verbose", False)
     try:
         args.func(args)
     except Exception as exc:

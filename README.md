@@ -74,6 +74,14 @@ Option:
 
 - `--json` gives raw JSON. With several CUPS, the JSON is a list.
 
+The tool has three options that work with every command:
+
+- `--wait SECONDS` sets the time to wait for the portal zip (default 180).
+- `--quiet` hides the progress lines.
+- `--verbose` shows more detail, such as the token refresh.
+
+Add them before or after the command.
+
 Example output:
 
 ```
@@ -145,6 +153,18 @@ zip needs one request, and the result is the same. See
 The report shows the tariff. When the tariff is not 2.0TD, the tool stops with
 an error and gives no report data. The full list of assumptions and limits is
 in [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md).
+
+## Development
+
+```bash
+pip install -e ".[dev]"
+ruff check .      # lint
+pytest            # tests (no network)
+```
+
+The tests cover the pure logic only: the 2.0TD periods, the zip read, the day
+status, the reading map and the aggregation. They need no session and no
+network.
 
 ## Security
 

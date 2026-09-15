@@ -22,8 +22,22 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/jacano/edistribucion-client"
 
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
 [project.scripts]
 edistribucion = "edistribucion:main"
 
 [tool.setuptools]
 py-modules = ["edistribucion"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B"]

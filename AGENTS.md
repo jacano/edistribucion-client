@@ -39,7 +39,8 @@ This file tells an LLM agent what this tool is and how to use it.
 | `edistribucion import-cookies` | import a cookies.txt |
 | `edistribucion set-session --sid` | store a session value by hand |
 
-The options `--sid` and `--session` go before or after the command.
+The options `--sid`, `--session`, `--wait`, `--quiet` and `--verbose` go before
+or after the command.
 
 ## report
 
@@ -99,10 +100,18 @@ See `docs/ASSUMPTIONS.md` for the full list of assumptions and limits.
 | `Aura error ...` | the portal returned an error. Show the message. |
 | `No sid found in the text.` | the text had no session. Ask for the value again. |
 
+## Tests and lint
+
+- `pip install -e ".[dev]"`, then `ruff check .` and `pytest`.
+- The tests cover the pure logic only. They need no network and no session.
+- CI runs both on push to `main` and on pull requests.
+
 ## Files
 
 - `edistribucion.py`: the tool.
-- `pyproject.toml`: the install data and the `edistribucion` command.
+- `tests/test_edistribucion.py`: the unit tests.
+- `pyproject.toml`: the install data, the `edistribucion` command, and the tool
+  settings for pytest and ruff.
 - `README.md`: the main guide.
 - `docs/INSTALL.md`: how to install and run the tool.
 - `docs/AUTHENTICATION.md`: how to get the session.
