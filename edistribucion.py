@@ -728,8 +728,10 @@ def load_context(args):
     except (RuntimeError, urllib.error.URLError):
         account = None
         try:
-            client = auto_login(args) or client
-            account = client.whoami() if client is not None else None
+            fresh = auto_login(args)
+            if fresh is not None:
+                client = fresh
+                account = client.whoami()
         except (RuntimeError, urllib.error.URLError, OSError):
             account = None
         if account is None:
