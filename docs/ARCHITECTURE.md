@@ -92,6 +92,8 @@ sequenceDiagram
     P-->>C: lstIds, lstCups (records with rate), maxYears
     C->>P: getFiles
     P-->>C: lstFiles (the current files)
+    C->>P: getListNotifications
+    P-->>C: lstNotifications (the current notifications)
     C->>P: createZip (roleId, lstCupsIds, data, start, end, downloadType=1)
     P-->>C: "request processed" (async)
     loop every 3 s, up to --wait seconds (default 180)
@@ -101,16 +103,29 @@ sequenceDiagram
     Note over C: stop when a new fileid appears
     C->>P: GET /areaprivada/sfc/servlet.shepherd/version/download/FILEID
     P-->>C: ZIP bytes
-    C->>P: deleteFile (transferId = Id)
-    Note over C: the file is removed from the portal
+    alt --keep is not set (the default)
+        C->>P: deleteFile (transferId = Id)
+        C->>P: getListNotifications
+        P-->>C: the new notification
+        C->>P: markAsDeleted (lstNotificationsIds)
+        Note over C: the zip and the notification are removed
+    else --keep is set
+        Note over C: the zip and the notification stay on the portal
+    end
 ```
 
 - `downloadType=1` is the hourly data. The portal also has a quarter-hourly
   value (`2`).
 - The range is the first contract start to the last contract end. The portal
   clips the ZIP per contract version. Each version becomes one CSV pair.
-- The tool lists the files first, so it can detect the new file and delete it
-  after the read.
+- The tool lists the files and the notifications first, so it can detect the new
+  ones and delete them after the read.
+- The notification has the title `Descarga de curvas de consumo` and the URL
+  `.../wp-massivemeasuredownload-v3#downloads`. The tool deletes only the new
+  notifications of this URL.
+- The portal can make no notification when the role has the setting "No deseo
+  recibir más notificaciones para este rol" (I do not want more notifications
+  for this role). In that case there is nothing to delete.
 
 ## 5. Data pipeline
 
@@ -178,6 +193,8 @@ flowchart TD
 | `create_zip` | `WP_Measure_v3_CTRL.createZip` | `apex://WP_Measure_v3_CTRL/ACTION$createZip` | `/areaprivada/s/wp-massivemeasuredownload-v3` |
 | `get_files` | `WP_Download_Transfer_CTRL.getFiles` | `apex://WP_Download_Transfer_CTRL/ACTION$getFiles` | `/areaprivada/s/wp-massivemeasuredownload-v3` |
 | `delete_file` | `WP_Download_Transfer_CTRL.deleteFile` | `apex://WP_Download_Transfer_CTRL/ACTION$deleteFile` | `/areaprivada/s/wp-massivemeasuredownload-v3` |
+| `notifications_list` | `WP_NotificationsList_CTRL.getListNotifications` | `apex://WP_NotificationsList_CTRL/ACTION$getListNotifications` | `/areaprivada/s/wp-notificationslist` |
+| `delete_notifications` | `WP_NotificationsList_CTRL.markAsDeleted` | `apex://WP_NotificationsList_CTRL/ACTION$markAsDeleted` | `/areaprivada/s/wp-notificationslist` |
 | `maximeter` | `WP_MaximeterHistogram_CTRL.getHistogramPoints` | `apex://WP_MaximeterHistogram_CTRL/ACTION$getHistogramPoints` | `/areaprivada/s/wp-maximeterhistogramdetail` |
 | `atr_detail` | `WP_ContractATRDetail_CTRL.getATRDetail` | `apex://WP_ContractATRDetail_CTRL/ACTION$getATRDetail` | `/areaprivada/s/wp-atrcontractdetail` |
 
@@ -226,6 +243,7 @@ the tool uses the one ZIP instead. See
 | Browserless login | `portal_login`, `login_context` |
 | Session file | `Session` |
 | Massive download | `list_measure_cups`, `create_zip`, `get_files`, `_download_measure_zip` |
+| Cleanup on the portal | `list_notifications`, `delete_notifications`, `download_notification_ids`, `delete_download_leftovers` |
 | ZIP read | `read_zip_rows`, `clock_hour`, `zip_hours` |
 | Period and day logic | `tariff_period`, `day_status`, `month_map`, `recent_ranges` |
 | Aggregation and report | `aggregate`, `fetch_hours`, `collect_consumption`, `_build_report`, `_print_report` |

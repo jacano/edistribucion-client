@@ -74,13 +74,33 @@ Option:
 
 - `--json` gives raw JSON. With several CUPS, the JSON is a list.
 
-The tool has three options that work with every command:
+The tool has these options. They work with every command:
 
 - `--wait SECONDS` sets the time to wait for the portal zip (default 180).
+- `--keep` keeps the zip file and the portal notification (see below).
 - `--quiet` hides the progress lines.
 - `--verbose` shows more detail, such as the token refresh.
 
 Add them before or after the command.
+
+### The zip file and the notification
+
+For each CUPS, the tool asks the portal for one zip with the massive curves.
+The portal makes the zip in the background and also creates a notification
+("Descarga de curvas de consumo").
+
+By default, the tool deletes both after the read:
+
+- the zip file, from the download list,
+- the notification, from the notification list.
+
+Add `--keep` to keep both on the portal. Use it to read the zip by hand, or to
+keep the portal history.
+
+The portal can disable the notification for a role. The setting is "No deseo
+recibir más notificaciones para este rol" (I do not want more notifications for
+this role). When it is on, the portal makes no notification, and there is
+nothing to delete.
 
 Example output:
 

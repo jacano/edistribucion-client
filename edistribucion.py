@@ -54,6 +54,7 @@ LOGIN_PAGE = "/areaprivada/s/login/"
 MEASURELIST_PAGE = "/areaprivada/s/wp-measurelist-v4"
 DETAIL_PAGE = "/areaprivada/s/wp-measure-detail-v4"
 DOWNLOAD_PAGE = "/areaprivada/s/wp-massivemeasuredownload-v3"
+NOTIFICATIONS_PAGE = "/areaprivada/s/wp-notificationslist"
 MAXPOWER_PAGE = "/areaprivada/s/wp-maximeterhistogramdetail"
 ATR_PAGE = "/areaprivada/s/wp-atrcontractdetail"
 
@@ -109,6 +110,12 @@ ACTIONS = {
     "delete_file": ("WP_Download_Transfer_CTRL.deleteFile",
                     "apex://WP_Download_Transfer_CTRL/ACTION$deleteFile",
                     "markup://c:WP_Download_Transfer_Table"),
+    "notifications_list": ("WP_NotificationsList_CTRL.getListNotifications",
+                           "apex://WP_NotificationsList_CTRL/ACTION$getListNotifications",
+                           "markup://c:WP_NotificationsListForm"),
+    "delete_notifications": ("WP_NotificationsList_CTRL.markAsDeleted",
+                             "apex://WP_NotificationsList_CTRL/ACTION$markAsDeleted",
+                             "markup://c:WP_NotificationsListForm"),
     "maximeter": ("WP_MaximeterHistogram_CTRL.getHistogramPoints",
                   "apex://WP_MaximeterHistogram_CTRL/ACTION$getHistogramPoints",
                   "markup://c:WP_MaximeterHistogramDetail"),
@@ -520,6 +527,13 @@ class Client:
     def delete_file(self, transfer_id):
         return self.call("delete_file", {"transferId": transfer_id}, DOWNLOAD_PAGE)
 
+    def list_notifications(self):
+        return self.call("notifications_list", {}, NOTIFICATIONS_PAGE).get("lstNotifications", [])
+
+    def delete_notifications(self, notification_ids):
+        return self.call("delete_notifications", {"lstNotificationsIds": notification_ids},
+                         NOTIFICATIONS_PAGE)
+
     def download_file(self, fileid):
         """Return the raw bytes of a file that get_files lists."""
         url = BASE + "/areaprivada/sfc/servlet.shepherd/version/download/" + fileid
@@ -880,11 +894,50 @@ def measure_tariff(listing, contracts):
     return None
 
 
-def _download_measure_zip(client, account, contracts, listing, wait_seconds):
+def download_notification_ids(notifications, known):
+    """Return the ids of the new download notifications."""
+    ids = []
+    for item in notifications:
+        identifier = item.get("Id")
+        if not identifier or identifier in known:
+            continue
+        if "wp-massivemeasuredownload" in (item.get("URL__c") or ""):
+            ids.append(identifier)
+    return ids
+
+
+def delete_download_leftovers(client, transfer_id, known_notifications, keep):
+    """Delete the zip file and the notification of this run, unless keep is true."""
+    if keep:
+        log("The zip and the notification stay on the portal (--keep).")
+        return
+    try:
+        client.delete_file(transfer_id)
+        log("Zip deleted.")
+    except (RuntimeError, urllib.error.URLError) as exc:
+        log("Could not delete the zip: %s" % exc)
+    try:
+        notifications = client.list_notifications()
+    except (RuntimeError, urllib.error.URLError) as exc:
+        log("Could not read the notifications: %s" % exc)
+        return
+    ids = download_notification_ids(notifications, known_notifications)
+    if not ids:
+        return
+    try:
+        client.delete_notifications(ids)
+        log("Notification deleted." if len(ids) == 1
+            else "Notifications deleted: %d." % len(ids))
+    except (RuntimeError, urllib.error.URLError) as exc:
+        log("Could not delete the notifications: %s" % exc)
+
+
+def _download_measure_zip(client, account, contracts, listing, wait_seconds, keep):
     """Ask the portal for one zip with all the hourly curves of a CUPS.
 
     The portal makes the zip in the background. This waits until the file
-    appears in the download list, then returns its bytes.
+    appears in the download list, then returns its bytes. After the read it
+    deletes the zip and its notification, unless keep is true.
     """
     visibility = account["visibility_id"]
     wanted = {item["contract_id"] for item in contracts}
@@ -898,6 +951,7 @@ def _download_measure_zip(client, account, contracts, listing, wait_seconds):
     end = datetime.strptime(max(ends), "%Y-%m-%d").strftime("%d/%m/%Y")
 
     known = {item.get("fileid") for item in (client.get_files(visibility).get("lstFiles") or [])}
+    known_notifications = {item.get("Id") for item in client.list_notifications()}
     log("Requesting the zip (%s -> %s). The portal makes it in the background." % (start, end))
     client.create_zip(visibility, contract_ids, records, start, end)
     attempts = max(1, wait_seconds // ZIP_WAIT_SECONDS)
@@ -912,19 +966,15 @@ def _download_measure_zip(client, account, contracts, listing, wait_seconds):
             fileid = fresh[0]["fileid"]
             log("Zip ready: %s. Downloading..." % title)
             payload = client.download_file(fileid)
-            log("Downloaded %.1f KiB. Deleting the zip from the portal." % (len(payload) / 1024.0))
-            try:
-                client.delete_file(fresh[0]["Id"])
-                log("Zip deleted.")
-            except (RuntimeError, urllib.error.URLError) as exc:
-                log("Could not delete the zip: %s" % exc)
+            log("Downloaded %.1f KiB." % (len(payload) / 1024.0))
+            delete_download_leftovers(client, fresh[0]["Id"], known_notifications, keep)
             return payload
     raise RuntimeError("The portal did not make the zip in time (%d s)." % wait_seconds)
 
 
-def fetch_hours(client, account, contracts, listing, wait_seconds=ZIP_WAIT_LIMIT):
+def fetch_hours(client, account, contracts, listing, wait_seconds=ZIP_WAIT_LIMIT, keep=False):
     """Download the zip and return {(day, hour): (kwh, real)}."""
-    payload = _download_measure_zip(client, account, contracts, listing, wait_seconds)
+    payload = _download_measure_zip(client, account, contracts, listing, wait_seconds, keep)
     hours = {}
     if payload:
         for day, hour, kwh, real in zip_hours(payload):
@@ -1023,9 +1073,10 @@ def aggregate(hours):
     }
 
 
-def collect_consumption(client, account, contracts, listing, wait_seconds=ZIP_WAIT_LIMIT):
+def collect_consumption(client, account, contracts, listing, wait_seconds=ZIP_WAIT_LIMIT,
+                        keep=False):
     """Download the history and return the aggregates."""
-    return aggregate(fetch_hours(client, account, contracts, listing, wait_seconds))
+    return aggregate(fetch_hours(client, account, contracts, listing, wait_seconds, keep))
 
 
 def _groups_list(group_dict):
@@ -1237,7 +1288,7 @@ def _print_report(result, titled=True):
         print("No estimated data. All the data is real.")
 
 
-def _build_report(client, account, cups, group, listing, wait_seconds):
+def _build_report(client, account, cups, group, listing, wait_seconds, keep):
     """Build the report of one CUPS. Return None when the CUPS has no data."""
     visibility = account["visibility_id"]
     current = next((item for item in group if not item.get("end")), group[-1])
@@ -1246,7 +1297,7 @@ def _build_report(client, account, cups, group, listing, wait_seconds):
     if tariff and not tariff.startswith(SUPPORTED_TARIFF):
         raise RuntimeError("Unsupported tariff: %s. This tool supports 2.0TD only."
                            % tariff)
-    data = collect_consumption(client, account, group, listing, wait_seconds)
+    data = collect_consumption(client, account, group, listing, wait_seconds, keep)
     if not data["from"]:
         log("  No data for this CUPS.")
         return None
@@ -1317,7 +1368,7 @@ def cmd_report(args):
     for cups in names:
         log("CUPS %s" % cups)
         group = [item for item in supplies if item["cups"] == cups]
-        result = _build_report(client, account, cups, group, listing, args.wait)
+        result = _build_report(client, account, cups, group, listing, args.wait, args.keep)
         if result:
             reports.append(result)
     if not reports:
@@ -1351,12 +1402,15 @@ def build_parser():
     parser.add_argument("--sid", help="value of the sid cookie")
     parser.add_argument("--wait", type=int, default=ZIP_WAIT_LIMIT,
                         help="seconds to wait for the portal zip (default %d)" % ZIP_WAIT_LIMIT)
+    parser.add_argument("--keep", action="store_true",
+                        help="keep the zip and the notification on the portal")
     parser.add_argument("--quiet", action="store_true", help="do not print the progress")
     parser.add_argument("--verbose", action="store_true", help="print more detail")
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--session", default=argparse.SUPPRESS)
     common.add_argument("--sid", default=argparse.SUPPRESS)
     common.add_argument("--wait", type=int, default=argparse.SUPPRESS)
+    common.add_argument("--keep", action="store_true", default=argparse.SUPPRESS)
     common.add_argument("--quiet", action="store_true", default=argparse.SUPPRESS)
     common.add_argument("--verbose", action="store_true", default=argparse.SUPPRESS)
     sub = parser.add_subparsers(dest="command", required=True)
