@@ -51,8 +51,6 @@ SITE = BASE + "/areaprivada"
 AURA_ENDPOINT = SITE + "/s/sfsites/aura"
 HOME_PAGE = "/areaprivada/s/"
 LOGIN_PAGE = "/areaprivada/s/login/"
-MEASURELIST_PAGE = "/areaprivada/s/wp-measurelist-v4"
-DETAIL_PAGE = "/areaprivada/s/wp-measure-detail-v4"
 DOWNLOAD_PAGE = "/areaprivada/s/wp-massivemeasuredownload-v3"
 NOTIFICATIONS_PAGE = "/areaprivada/s/wp-notificationslist"
 MAXPOWER_PAGE = "/areaprivada/s/wp-maximeterhistogramdetail"
@@ -92,12 +90,6 @@ ACTIONS = {
     "login_info": ("WP_Monitor_CTRL.getLoginInfo",
                    "apex://WP_Monitor_CTRL/ACTION$getLoginInfo",
                    "markup://c:WP_Monitor"),
-    "list_cups": ("WP_Measure_v3_CTRL.getListCups",
-                  "apex://WP_Measure_v3_CTRL/ACTION$getListCups",
-                  "markup://c:WP_Measure_List_v4"),
-    "get_info": ("WP_Measure_v3_CTRL.getInfo",
-                 "apex://WP_Measure_v3_CTRL/ACTION$getInfo",
-                 "markup://c:WP_Measure_Detail_v4"),
     "measure_list": ("WP_Measure_v3_CTRL.getListCups",
                      "apex://WP_Measure_v3_CTRL/ACTION$getListCups",
                      "markup://c:WP_Massive_Measure_Download_v3"),
@@ -390,7 +382,7 @@ def portal_login(username, password, start_url=""):
 class Client:
     def __init__(self, session):
         self.session = session
-        self._tokens = {}
+        self._token = None
         self.fwuid = FWUID
         self.app_version = APP_VERSION
 
@@ -422,8 +414,10 @@ class Client:
 
     # --- anti-CSRF token delivered via Set-Cookie ---
     def token(self, page_uri, force=False):
-        if not force and page_uri in self._tokens:
-            return self._tokens[page_uri]
+        # The token is the value of a session cookie, so one token works for
+        # every page. Fetch it one time for each session.
+        if self._token and not force:
+            return self._token
         debug("  token: GET %s" % page_uri)
         status, headers, _ = self._request(
             "GET", BASE + page_uri,
@@ -435,7 +429,7 @@ class Client:
                 token = match.group(2)
         if not token:
             raise RuntimeError("Could not obtain aura.token (expired session?). HTTP %s" % status)
-        self._tokens[page_uri] = token
+        self._token = token
         return token
 
     # --- generic Aura call ---
@@ -482,35 +476,6 @@ class Client:
             "profiles": [item.get("label") for item in auth],
             "auth_list": auth,
         }
-
-    def list_supplies(self, visibility_id):
-        result = self.call("list_cups", {"sIdentificador": visibility_id}, MEASURELIST_PAGE)
-        supplies = []
-        for contract in (result.get("data") or {}).get("lstContAux", []):
-            cups = contract.get("CUPs__r") or {}
-            power = {key.replace("Requested_power_", "P").replace("__c", ""): value
-                     for key, value in contract.items()
-                     if key.startswith("Requested_power_") and value is not None}
-            supplies.append({
-                "contract_id": contract.get("Id"),
-                "cups": cups.get("Name"),
-                "cups_id": cups.get("Id"),
-                "tariff": contract.get("Tariff_Code_Description__c"),
-                "type_pm": contract.get("Type_PM__c"),
-                "start": contract.get("Version_start_date__c"),
-                "end": contract.get("Version_end_date__c"),
-                "address": cups.get("Provisioning_address__c"),
-                "city": cups.get("NS_Town_Description__c"),
-                "postal_code": cups.get("NS_Postal_Code__c"),
-                "voltage": cups.get("type_of_tension__c"),
-                "contracted_power_kw": power,
-            })
-        return supplies
-
-    def get_info(self, contract_id, visibility_id):
-        page = "%s?aId=%s&vis=%s" % (DETAIL_PAGE, contract_id, visibility_id)
-        params = {"contId": contract_id, "visId": visibility_id}
-        return self.call("get_info", params, page).get("data", {})
 
     def list_measure_cups(self, visibility_id):
         return self.call("measure_list", {"sIdentificador": visibility_id}, DOWNLOAD_PAGE)
@@ -739,6 +704,31 @@ def auto_login(args):
     return Client(session)
 
 
+def build_supplies(listing):
+    """Build the supplies from the lstContAux records of a list call."""
+    supplies = []
+    for contract in listing.get("lstContAux") or []:
+        cups = contract.get("CUPs__r") or {}
+        power = {key.replace("Requested_power_", "P").replace("__c", ""): value
+                 for key, value in contract.items()
+                 if key.startswith("Requested_power_") and value is not None}
+        supplies.append({
+            "contract_id": contract.get("Id"),
+            "cups": cups.get("Name"),
+            "cups_id": cups.get("Id"),
+            "tariff": contract.get("Tariff_Code_Description__c"),
+            "type_pm": contract.get("Type_PM__c"),
+            "start": contract.get("Version_start_date__c"),
+            "end": contract.get("Version_end_date__c"),
+            "address": cups.get("Provisioning_address__c"),
+            "city": cups.get("NS_Town_Description__c"),
+            "postal_code": cups.get("NS_Postal_Code__c"),
+            "voltage": cups.get("type_of_tension__c"),
+            "contracted_power_kw": power,
+        })
+    return supplies
+
+
 def load_context(args):
     client = build_client(args)
     log("Checking the session...")
@@ -756,8 +746,9 @@ def load_context(args):
         if account is None:
             raise
     log("Reading the list of supplies...")
-    supplies = client.list_supplies(account["visibility_id"])
-    return client, account, supplies
+    listing = client.list_measure_cups(account["visibility_id"]).get("data") or {}
+    supplies = build_supplies(listing)
+    return client, account, supplies, listing
 
 
 # ---------------------------------------------------------------- commands
@@ -906,10 +897,10 @@ def download_notification_ids(notifications, known):
     return ids
 
 
-def delete_download_leftovers(client, transfer_id, known_notifications, keep):
-    """Delete the zip file and the notification of this run, unless keep is true."""
-    if keep:
-        log("The zip and the notification stay on the portal (--keep).")
+def delete_download_leftovers(client, transfer_id, known_notifications, keep_artifacts):
+    """Delete the zip file and the notification of this run, unless keep_artifacts is true."""
+    if keep_artifacts:
+        log("The zip and the notification stay on the portal (--keep-artifacts).")
         return
     try:
         client.delete_file(transfer_id)
@@ -932,12 +923,12 @@ def delete_download_leftovers(client, transfer_id, known_notifications, keep):
         log("Could not delete the notifications: %s" % exc)
 
 
-def _download_measure_zip(client, account, contracts, listing, wait_seconds, keep):
+def _download_measure_zip(client, account, contracts, listing, wait_seconds, keep_artifacts):
     """Ask the portal for one zip with all the hourly curves of a CUPS.
 
     The portal makes the zip in the background. This waits until the file
     appears in the download list, then returns its bytes. After the read it
-    deletes the zip and its notification, unless keep is true.
+    deletes the zip and its notification, unless keep_artifacts is true.
     """
     visibility = account["visibility_id"]
     wanted = {item["contract_id"] for item in contracts}
@@ -967,14 +958,16 @@ def _download_measure_zip(client, account, contracts, listing, wait_seconds, kee
             log("Zip ready: %s. Downloading..." % title)
             payload = client.download_file(fileid)
             log("Downloaded %.1f KiB." % (len(payload) / 1024.0))
-            delete_download_leftovers(client, fresh[0]["Id"], known_notifications, keep)
+            delete_download_leftovers(client, fresh[0]["Id"], known_notifications, keep_artifacts)
             return payload
     raise RuntimeError("The portal did not make the zip in time (%d s)." % wait_seconds)
 
 
-def fetch_hours(client, account, contracts, listing, wait_seconds=ZIP_WAIT_LIMIT, keep=False):
+def fetch_hours(client, account, contracts, listing, wait_seconds=ZIP_WAIT_LIMIT,
+                keep_artifacts=False):
     """Download the zip and return {(day, hour): (kwh, real)}."""
-    payload = _download_measure_zip(client, account, contracts, listing, wait_seconds, keep)
+    payload = _download_measure_zip(client, account, contracts, listing, wait_seconds,
+                                    keep_artifacts)
     hours = {}
     if payload:
         for day, hour, kwh, real in zip_hours(payload):
@@ -1074,9 +1067,9 @@ def aggregate(hours):
 
 
 def collect_consumption(client, account, contracts, listing, wait_seconds=ZIP_WAIT_LIMIT,
-                        keep=False):
+                        keep_artifacts=False):
     """Download the history and return the aggregates."""
-    return aggregate(fetch_hours(client, account, contracts, listing, wait_seconds, keep))
+    return aggregate(fetch_hours(client, account, contracts, listing, wait_seconds, keep_artifacts))
 
 
 def _groups_list(group_dict):
@@ -1288,7 +1281,7 @@ def _print_report(result, titled=True):
         print("No estimated data. All the data is real.")
 
 
-def _build_report(client, account, cups, group, listing, wait_seconds, keep):
+def _build_report(client, account, cups, group, listing, wait_seconds, keep_artifacts):
     """Build the report of one CUPS. Return None when the CUPS has no data."""
     visibility = account["visibility_id"]
     current = next((item for item in group if not item.get("end")), group[-1])
@@ -1297,7 +1290,7 @@ def _build_report(client, account, cups, group, listing, wait_seconds, keep):
     if tariff and not tariff.startswith(SUPPORTED_TARIFF):
         raise RuntimeError("Unsupported tariff: %s. This tool supports 2.0TD only."
                            % tariff)
-    data = collect_consumption(client, account, group, listing, wait_seconds, keep)
+    data = collect_consumption(client, account, group, listing, wait_seconds, keep_artifacts)
     if not data["from"]:
         log("  No data for this CUPS.")
         return None
@@ -1360,15 +1353,14 @@ def _build_report(client, account, cups, group, listing, wait_seconds, keep):
 
 
 def cmd_report(args):
-    client, account, supplies = load_context(args)
-    visibility = account["visibility_id"]
+    client, account, supplies, listing = load_context(args)
     names = sorted({item["cups"] for item in supplies if item["cups"]})
-    listing = client.list_measure_cups(visibility).get("data") or {}
     reports = []
     for cups in names:
         log("CUPS %s" % cups)
         group = [item for item in supplies if item["cups"] == cups]
-        result = _build_report(client, account, cups, group, listing, args.wait, args.keep)
+        result = _build_report(client, account, cups, group, listing, args.wait,
+                               args.keep_artifacts)
         if result:
             reports.append(result)
     if not reports:
@@ -1402,7 +1394,7 @@ def build_parser():
     parser.add_argument("--sid", help="value of the sid cookie")
     parser.add_argument("--wait", type=int, default=ZIP_WAIT_LIMIT,
                         help="seconds to wait for the portal zip (default %d)" % ZIP_WAIT_LIMIT)
-    parser.add_argument("--keep", action="store_true",
+    parser.add_argument("--keep-artifacts", action="store_true",
                         help="keep the zip and the notification on the portal")
     parser.add_argument("--quiet", action="store_true", help="do not print the progress")
     parser.add_argument("--verbose", action="store_true", help="print more detail")
@@ -1410,7 +1402,7 @@ def build_parser():
     common.add_argument("--session", default=argparse.SUPPRESS)
     common.add_argument("--sid", default=argparse.SUPPRESS)
     common.add_argument("--wait", type=int, default=argparse.SUPPRESS)
-    common.add_argument("--keep", action="store_true", default=argparse.SUPPRESS)
+    common.add_argument("--keep-artifacts", action="store_true", default=argparse.SUPPRESS)
     common.add_argument("--quiet", action="store_true", default=argparse.SUPPRESS)
     common.add_argument("--verbose", action="store_true", default=argparse.SUPPRESS)
     sub = parser.add_subparsers(dest="command", required=True)

@@ -30,6 +30,6 @@ tool was built and tested with one real 2.0TD account.
 - The portal makes the zip in the background. A large account can need more
   than the 3 minute wait.
 - The tool deletes the zip file and its notification after the read. Use
-  `--keep` to keep both on the portal.
+  `--keep-artifacts` to keep both on the portal.
 - The portal makes no notification when the role has the setting to stop the
   notifications. Then there is nothing to delete.

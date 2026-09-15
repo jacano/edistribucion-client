@@ -40,7 +40,7 @@ sequenceDiagram
     C->>P: POST /s/sfsites/aura?r=1&other.ROUTE=1
     Note over C: body: message + aura.context +<br/>aura.pageURI + aura.token
     P-->>C: JSON: actions[0].returnValue + context.fwuid
-    C->>C: cache the token per page
+    C->>C: use the token for every page
     alt stale token ("/*ERROR*/" in the text)
         C->>P: GET the page again (new token)
         C->>P: POST the action again
@@ -49,6 +49,9 @@ sequenceDiagram
 
 - The token is not decoded. The tool reads the `eyJ...` value from the
   `__Host-ERIC...` cookie and sends it back.
+- The token is the value of a session cookie, so the tool fetches it one time
+  for each run and reuses it for every page. This saves one page load for each
+  page.
 - The `fwuid` and the app version are refreshed from `context` in every
   response. This keeps the tool working when the portal changes them.
 
@@ -103,13 +106,13 @@ sequenceDiagram
     Note over C: stop when a new fileid appears
     C->>P: GET /areaprivada/sfc/servlet.shepherd/version/download/FILEID
     P-->>C: ZIP bytes
-    alt --keep is not set (the default)
+    alt --keep-artifacts is not set (the default)
         C->>P: deleteFile (transferId = Id)
         C->>P: getListNotifications
         P-->>C: the new notification
         C->>P: markAsDeleted (lstNotificationsIds)
         Note over C: the zip and the notification are removed
-    else --keep is set
+    else --keep-artifacts is set
         Note over C: the zip and the notification stay on the portal
     end
 ```
@@ -187,8 +190,6 @@ flowchart TD
 | alias | route | descriptor | page |
 | ----- | ----- | ---------- | ---- |
 | `login_info` | `WP_Monitor_CTRL.getLoginInfo` | `apex://WP_Monitor_CTRL/ACTION$getLoginInfo` | `/areaprivada/s/` |
-| `list_cups` | `WP_Measure_v3_CTRL.getListCups` | `apex://WP_Measure_v3_CTRL/ACTION$getListCups` | `/areaprivada/s/wp-measurelist-v4` |
-| `get_info` | `WP_Measure_v3_CTRL.getInfo` | `apex://WP_Measure_v3_CTRL/ACTION$getInfo` | `/areaprivada/s/wp-measure-detail-v4` |
 | `measure_list` | `WP_Measure_v3_CTRL.getListCups` | `apex://WP_Measure_v3_CTRL/ACTION$getListCups` | `/areaprivada/s/wp-massivemeasuredownload-v3` |
 | `create_zip` | `WP_Measure_v3_CTRL.createZip` | `apex://WP_Measure_v3_CTRL/ACTION$createZip` | `/areaprivada/s/wp-massivemeasuredownload-v3` |
 | `get_files` | `WP_Download_Transfer_CTRL.getFiles` | `apex://WP_Download_Transfer_CTRL/ACTION$getFiles` | `/areaprivada/s/wp-massivemeasuredownload-v3` |
@@ -242,7 +243,8 @@ the tool uses the one ZIP instead. See
 | Aura body and POST | `Client.call`, `Client.token`, `Client._read_context` |
 | Browserless login | `portal_login`, `login_context` |
 | Session file | `Session` |
-| Massive download | `list_measure_cups`, `create_zip`, `get_files`, `_download_measure_zip` |
+| Context and supplies | `load_context`, `build_supplies`, `list_measure_cups` |
+| Massive download | `create_zip`, `get_files`, `_download_measure_zip` |
 | Cleanup on the portal | `list_notifications`, `delete_notifications`, `download_notification_ids`, `delete_download_leftovers` |
 | ZIP read | `read_zip_rows`, `clock_hour`, `zip_hours` |
 | Period and day logic | `tariff_period`, `day_status`, `month_map`, `recent_ranges` |

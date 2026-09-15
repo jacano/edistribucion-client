@@ -39,7 +39,7 @@ This file tells an LLM agent what this tool is and how to use it.
 | `edistribucion import-cookies` | import a cookies.txt |
 | `edistribucion set-session --sid` | store a session value by hand |
 
-The options `--sid`, `--session`, `--wait`, `--keep`, `--quiet` and `--verbose`
+The options `--sid`, `--session`, `--wait`, `--keep-artifacts`, `--quiet` and `--verbose`
 go before or after the command.
 
 ## report
@@ -73,7 +73,7 @@ goes to stdout. So `--json` stays correct when you capture the output.
 
 The tool asks the portal for one zip with the hourly curves (action
 `createZip`), waits for it, and reads it. The portal also makes a notification.
-Then the tool deletes the zip and the notification. Add `--keep` to keep both
+Then the tool deletes the zip and the notification. Add `--keep-artifacts` to keep both
 on the portal. The period (P1, P2, P3) comes from the 2.0TD calendar, not from a
 data call.
 

@@ -77,7 +77,7 @@ Option:
 The tool has these options. They work with every command:
 
 - `--wait SECONDS` sets the time to wait for the portal zip (default 180).
-- `--keep` keeps the zip file and the portal notification (see below).
+- `--keep-artifacts` keeps the zip file and the portal notification (see below).
 - `--quiet` hides the progress lines.
 - `--verbose` shows more detail, such as the token refresh.
 
@@ -94,7 +94,7 @@ By default, the tool deletes both after the read:
 - the zip file, from the download list,
 - the notification, from the notification list.
 
-Add `--keep` to keep both on the portal. Use it to read the zip by hand, or to
+Add `--keep-artifacts` to keep both on the portal. Use it to read the zip by hand, or to
 keep the portal history.
 
 The portal can disable the notification for a role. The setting is "No deseo
