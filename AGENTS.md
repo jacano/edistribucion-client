@@ -40,7 +40,7 @@ This file tells an LLM agent what this tool is and how to use it.
 | `edistribucion set-session --sid` | store a session value by hand |
 
 The options `--sid`, `--session`, `--wait`, `--keep-artifacts`, `--quiet`,
-`--verbose` and `--zone` go before or after the command.
+`--verbose`, `--zone` and `--export-csv` go before or after the command.
 
 ## report
 
@@ -56,10 +56,12 @@ contains:
 - the CUPS, the tariff, and the contracted power per period,
 - the period covered (the first and the last date),
 - the real and estimated totals and the split by `P1`, `P2`, `P3`,
-- the consumption by year (with the P1, P2, P3 split), month, and hour, with
-  real and estimated values,
-- the maximum consumption in one hour per year,
-- the maximum demanded power per year (the full list per month is in the JSON),
+- the consumption by year (with the P1, P2, P3 split), month, hour, and
+  weekday, with real and estimated values,
+- the maximum consumption in one hour per year, from the real values,
+- the maximum demanded power per year, with the split by power period (P1 and
+  P2) and the months above the contracted power (the full list per month is in
+  the JSON),
 - a zoom of the last 3 months (the last reading and its delay, and the real,
   estimated and pending ranges), and a monthly reading map (R real,
   E estimated, M mixed, . no data; pending days do not count).

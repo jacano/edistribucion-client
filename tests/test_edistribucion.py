@@ -110,6 +110,45 @@ def test_zip_hours_handles_a_day_of_23_rows():
     assert hours == [0, 1, 3] + list(range(4, 24))
 
 
+# ------------------------------------------------------------------- csv export
+def test_write_hours_csv(tmp_path):
+    payload = make_zip([("ES00_Horario.csv",
+                         csv_text(["ES00;04/09/2026;1;0,085;R",
+                                   "ES00;04/09/2026;2;0,106;E"]))])
+    path = tmp_path / "curva.csv"
+    ed.write_hours_csv(payload, "ES00", str(path))
+    lines = path.read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "CUPS;Fecha;Hora;AE_kWh;AS_KWh;AE_AUTOCONS_kwh;REAL/ESTIMADO"
+    assert lines[1] == "ES00;04/09/2026;1;0.085;0.0;0.0;R"
+    assert lines[2] == "ES00;04/09/2026;2;0.106;0.0;0.0;E"
+
+
+def test_export_path_for():
+    assert ed.export_path_for(None, "ES00", True) is None
+    assert ed.export_path_for("a.csv", "ES00", False) == "a.csv"
+    assert ed.export_path_for("a.csv", "ES00", True) == "a-ES00.csv"
+
+
+# ------------------------------------------------------------- max demand periods
+def test_demand_point():
+    point = ed.demand_point({"val": "5,024", "date": "20-02-2025 21:45"})
+    assert point == {"kw": 5.024, "date": "20-02-2025", "hour": "21:45"}
+    assert ed.demand_point(None) is None
+    assert ed.demand_point({"val": ""}) is None
+
+
+def test_max_demand_periods_picks_the_top_of_each_period():
+    monthly = {
+        "2025-01": {"P1": {"kw": 4.0, "date": "01-01-2025", "hour": "10:00"},
+                    "P2": {"kw": 3.0, "date": "01-01-2025", "hour": "01:00"}},
+        "2025-02": {"P1": {"kw": 4.5, "date": "02-02-2025", "hour": "11:00"},
+                    "P2": {"kw": 2.5, "date": "03-02-2025", "hour": "02:00"}},
+    }
+    result = ed.max_demand_periods(monthly)
+    assert result["2025"]["P1"]["kw"] == 4.5
+    assert result["2025"]["P2"]["kw"] == 3.0
+
+
 # ------------------------------------------------------------------- day_status
 def test_day_status():
     assert ed.day_status(None) == "."
@@ -180,6 +219,23 @@ def test_aggregate_uses_the_zone():
     hours = {(date(2026, 1, 2), 14): (1.0, True)}   # Friday, 14:00-15:00
     assert ed.aggregate(hours)["periods_real_kwh"]["P2"] == 1.0
     assert ed.aggregate(hours, ed.ZONE_CEUTA_MELILLA)["periods_real_kwh"]["P1"] == 1.0
+
+
+def test_aggregate_groups_by_weekday():
+    hours = {(date(2026, 1, 2), 12): (2.0, True),   # Friday
+             (date(2026, 1, 3), 12): (3.0, True)}   # Saturday
+    weekdays = ed.aggregate(hours)["groups"]["weekday"]
+    assert weekdays["Fri"]["real_kwh"] == 2.0
+    assert weekdays["Sat"]["real_kwh"] == 3.0
+
+
+def test_groups_list_keeps_the_given_order():
+    groups = {
+        "B": {"real_kwh": 1.0, "estimated_kwh": 0.0, "real_hours": 1, "estimated_hours": 0},
+        "A": {"real_kwh": 2.0, "estimated_kwh": 0.0, "real_hours": 1, "estimated_hours": 0},
+    }
+    assert [row["key"] for row in ed._groups_list(groups)] == ["A", "B"]
+    assert [row["key"] for row in ed._groups_list(groups, ["B", "A"])] == ["B", "A"]
 
 
 # ---------------------------------------------------------------- measure_tariff

@@ -144,6 +144,9 @@ ZONE_FLAT_HOURS = {
 CEUTA_MELILLA_POSTAL = ("51", "52")
 CEUTA_MELILLA_CITIES = ("ceuta", "melilla")
 
+# Day names for the consumption by weekday. `date.weekday()` gives 0 for Monday.
+WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
 # This tool only knows the 2.0TD tariff (three periods: P1, P2, P3).
 SUPPORTED_TARIFF = "2.0"
 
@@ -656,6 +659,23 @@ def zip_hours(payload):
         yield day, clock_hour(count, index), kwh, real
 
 
+def write_hours_csv(payload, cups, path):
+    """Write the hourly curves as a CSV that other tools can read.
+
+    The header is the one of the portal, so the file works with the CSV import
+    of the electricity comparators: CUPS;Fecha;Hora;AE_kWh;AS_KWh;
+    AE_AUTOCONS_kwh;REAL/ESTIMADO. `Hora` counts from 1 inside the day, so a day
+    of the change of the hour has 23 or 25 rows.
+    """
+    with open(path, "w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle, delimiter=";")
+        writer.writerow(["CUPS", "Fecha", "Hora", "AE_kWh", "AS_KWh",
+                         "AE_AUTOCONS_kwh", "REAL/ESTIMADO"])
+        for day, index, _count, kwh, real in read_zip_rows(payload):
+            writer.writerow([cups or "", day.strftime("%d/%m/%Y"), index,
+                             "%.3f" % kwh, "0.0", "0.0", "R" if real else "E"])
+
+
 def parse_cookies_file(path, domain=None):
     """Read a cookies file. Accepts Netscape cookies.txt or a JSON export.
 
@@ -1008,10 +1028,13 @@ def _download_measure_zip(client, account, contracts, listing, wait_seconds, kee
 
 
 def fetch_hours(client, account, contracts, listing, wait_seconds=ZIP_WAIT_LIMIT,
-                keep_artifacts=False):
+                keep_artifacts=False, export_path=None, cups=None):
     """Download the zip and return {(day, hour): (kwh, real)}."""
     payload = _download_measure_zip(client, account, contracts, listing, wait_seconds,
                                     keep_artifacts)
+    if payload and export_path:
+        write_hours_csv(payload, cups, export_path)
+        log("Wrote the hourly CSV to %s." % export_path)
     hours = {}
     if payload:
         for day, hour, kwh, real in zip_hours(payload):
@@ -1025,7 +1048,7 @@ def fetch_hours(client, account, contracts, listing, wait_seconds=ZIP_WAIT_LIMIT
 
 def aggregate(hours, zone=ZONE_PENINSULA):
     """Build the consumption aggregates from {(day, hour): (kwh, real)}."""
-    groups = {"year": {}, "month": {}, "hour": {}}
+    groups = {"year": {}, "month": {}, "hour": {}, "weekday": {}}
     periods_real = {"P1": 0.0, "P2": 0.0, "P3": 0.0}
     periods_estimated = {"P1": 0.0, "P2": 0.0, "P3": 0.0}
     periods_year = {}
@@ -1057,7 +1080,8 @@ def aggregate(hours, zone=ZONE_PENINSULA):
         period = tariff_period(day, hour, zone)
         for group, gkey in (("year", "%04d" % day.year),
                             ("month", "%04d-%02d" % (day.year, day.month)),
-                            ("hour", hour_key)):
+                            ("hour", hour_key),
+                            ("weekday", WEEKDAYS[day.weekday()])):
             entry = bucket(group, gkey)
             if real:
                 entry["real_kwh"] += kwh
@@ -1111,24 +1135,39 @@ def aggregate(hours, zone=ZONE_PENINSULA):
 
 
 def collect_consumption(client, account, contracts, listing, wait_seconds=ZIP_WAIT_LIMIT,
-                        keep_artifacts=False, zone=ZONE_PENINSULA):
+                        keep_artifacts=False, zone=ZONE_PENINSULA, export_path=None, cups=None):
     """Download the history and return the aggregates."""
-    return aggregate(fetch_hours(client, account, contracts, listing, wait_seconds, keep_artifacts),
-                     zone)
+    return aggregate(fetch_hours(client, account, contracts, listing, wait_seconds,
+                                 keep_artifacts, export_path, cups), zone)
 
 
-def _groups_list(group_dict):
+def _groups_list(group_dict, order=None):
+    """Return the groups as a list. `order` sets the key order when given."""
+    keys = [key for key in order if key in group_dict] if order else sorted(group_dict)
     return [{
         "key": key,
-        "real_kwh": round(value["real_kwh"], 3),
-        "estimated_kwh": round(value["estimated_kwh"], 3),
-        "real_hours": value["real_hours"],
-        "estimated_hours": value["estimated_hours"],
-    } for key, value in sorted(group_dict.items())]
+        "real_kwh": round(group_dict[key]["real_kwh"], 3),
+        "estimated_kwh": round(group_dict[key]["estimated_kwh"], 3),
+        "real_hours": group_dict[key]["real_hours"],
+        "estimated_hours": group_dict[key]["estimated_hours"],
+    } for key in keys]
+
+
+def demand_point(point):
+    """Return {"kw", "date", "hour"} from a maximeter period, or None."""
+    if not point or point.get("val") in (None, ""):
+        return None
+    try:
+        kw = float(str(point["val"]).replace(",", "."))
+    except ValueError:
+        return None
+    stamp = str(point.get("date") or "")
+    day, _, hour = stamp.partition(" ")
+    return {"kw": kw, "date": day, "hour": hour or point.get("hour")}
 
 
 def _max_demand(client, account, cups_id, year_from, year_to):
-    """Return the maximum demanded power per month, with the date and the hour."""
+    """Return the maximum demanded power per month and per power period (P1, P2)."""
     monthly = {}
     for year in range(year_from, year_to + 1):
         data = client.get_maximeter(
@@ -1139,8 +1178,27 @@ def _max_demand(client, account, cups_id, year_from, year_to):
             date = point.get("date") or ""
             parts = date.split("-")
             key = "%s-%s" % (parts[2], parts[1]) if len(parts) == 3 else date
-            monthly[key] = {"kw": point.get("value"), "date": date, "hour": point.get("hour")}
+            entry = {}
+            for source, name in (("punta", "P1"), ("valle", "P2")):
+                found = demand_point(point.get(source))
+                if found:
+                    entry[name] = found
+            if entry:
+                monthly[key] = entry
     return monthly
+
+
+def max_demand_periods(monthly_power):
+    """Group the maximum demanded power per year and per power period (P1, P2)."""
+    years = {}
+    for month_key, info in monthly_power.items():
+        year = month_key.split("-")[0]
+        slot = years.setdefault(year, {})
+        for name in ("P1", "P2"):
+            point = info.get(name)
+            if point and (name not in slot or point["kw"] > slot[name]["kw"]):
+                slot[name] = point
+    return years
 
 
 def day_status(counts):
@@ -1282,24 +1340,51 @@ def _print_report(result, titled=True):
 
     _print_kwh_table("  By month", "Month", result["consumption_by_month"])
     _print_kwh_table("  By hour of day", "Hour", result["consumption_by_hour"])
+    _print_kwh_table("  By weekday", "Day", result["consumption_by_weekday"])
     print()
     print("MAXIMUM PER YEAR")
-    print("  Peak hour: the most energy in one hour (kWh). Peak demand: the top")
-    print("  15 minute power (kW), from the portal. They can be on other days.")
-    print("  %-4s  %10s  %-20s  %11s  %s"
-          % ("Year", "Peak hour", "When", "Peak demand", "When"))
+    print("  Peak hour: the most energy in one hour (kWh), from the real values.")
+    print("  %-4s  %10s  %s" % ("Year", "Peak hour", "When"))
     hourly = result["max_hourly_by_year"]
-    demand = result["max_demand_by_year"]
-    for year in sorted(set(hourly) | set(demand)):
-        peak = hourly.get(year)
-        power = demand.get(year)
-        peak_kwh = "%.3f kWh" % peak["kwh"] if peak else "-"
-        peak_when = "%s %s" % (peak["date"], peak["hour"]) if peak else "-"
-        power_kw = "%.3f kW" % power["kw"] if power else "-"
-        power_when = ("%s %s" % (power["date"].replace("-", "/"), power["hour"])
-                      if power else "-")
-        print("  %-4s  %10s  %-20s  %11s  %s"
-              % (year, peak_kwh, peak_when, power_kw, power_when))
+    for year in sorted(hourly):
+        peak = hourly[year]
+        print("  %-4s  %10s  %s"
+              % (year, "%.3f kWh" % peak["kwh"], "%s %s" % (peak["date"], peak["hour"])))
+    print()
+    print("MAXIMUM DEMANDED POWER (kW, 15 minute measure)")
+    print("  The contract has one power for P1 and one power for P2.")
+    periods = result["max_demand_by_period"]
+    print("  %-4s  %11s  %-18s  %11s  %s"
+          % ("Year", "P1", "When", "P2", "When"))
+    for year in sorted(periods):
+        slot = periods[year]
+        cells = []
+        for name in ("P1", "P2"):
+            point = slot.get(name)
+            cells.append((" %.3f kW" % point["kw"], "%s %s" % (point["date"], point["hour"]))
+                         if point else ("-", "-"))
+        print("  %-4s  %11s  %-18s  %11s  %s"
+              % (year, cells[0][0], cells[0][1], cells[1][0], cells[1][1]))
+    limits = (("P1", result["contracted_power_kw"].get("P1")),
+              ("P2", result["contracted_power_kw"].get("P2")))
+    over = []
+    for month_key, info in sorted(result["max_demand_by_month"].items()):
+        for name, limit in limits:
+            point = info.get(name)
+            if point and limit and point["kw"] > limit:
+                over.append("%s %s %.3f kW" % (month_key, name, point["kw"]))
+    print("  The portal does not return every month.")
+    if over:
+        print("  Months above the contracted power (possible excess):")
+        line = "   "
+        for item in over:
+            if len(line) + len(item) > 74:
+                print(line)
+                line = "   "
+            line += " " + item
+        print(line)
+    else:
+        print("  No month above the contracted power.")
     print()
     recent = result["recent"]
     labels = {"R": "real", "E": "estimated", "M": "mixed",
@@ -1328,7 +1413,7 @@ def _print_report(result, titled=True):
 
 
 def _build_report(client, account, cups, group, listing, wait_seconds, keep_artifacts,
-                  zone=None):
+                  zone=None, export_path=None):
     """Build the report of one CUPS. Return None when the CUPS has no data."""
     visibility = account["visibility_id"]
     current = next((item for item in group if not item.get("end")), group[-1])
@@ -1340,7 +1425,7 @@ def _build_report(client, account, cups, group, listing, wait_seconds, keep_arti
         raise RuntimeError("Unsupported tariff: %s. This tool supports 2.0TD only."
                            % tariff)
     data = collect_consumption(client, account, group, listing, wait_seconds, keep_artifacts,
-                               zone)
+                               zone, export_path, cups)
     if not data["from"]:
         log("  No data for this CUPS.")
         return None
@@ -1350,11 +1435,6 @@ def _build_report(client, account, cups, group, listing, wait_seconds, keep_arti
         % (data["from"].year, data["to"].year))
     monthly_power = _max_demand(client, account, current["cups_id"],
                                 data["from"].year, data["to"].year)
-    year_power = {}
-    for month_key, info in monthly_power.items():
-        year = int(month_key.split("-")[0])
-        if year not in year_power or info["kw"] > year_power[year]["kw"]:
-            year_power[year] = info
     counts = data["day_counts"]
     window_end = max(counts) if counts else data["to"]
     today = date.today()
@@ -1394,18 +1474,31 @@ def _build_report(client, account, cups, group, listing, wait_seconds, keep_arti
         "consumption_by_year": _groups_list(data["groups"]["year"]),
         "consumption_by_month": _groups_list(data["groups"]["month"]),
         "consumption_by_hour": _groups_list(data["groups"]["hour"]),
+        "consumption_by_weekday": _groups_list(data["groups"]["weekday"], WEEKDAYS),
         "max_hourly_by_year": {str(y): {"kwh": round(v[0], 3), "date": v[1], "hour": v[2]}
                                for y, v in sorted(data["year_peak"].items())},
         "max_hourly_by_month": {k: {"kwh": round(v[0], 3), "date": v[1], "hour": v[2]}
                                 for k, v in sorted(data["month_peak"].items())},
-        "max_demand_by_year": {str(y): v for y, v in sorted(year_power.items())},
+        "max_demand_by_period": {str(y): v
+                                 for y, v in sorted(max_demand_periods(monthly_power).items())},
         "max_demand_by_month": monthly_power,
     }
+
+
+def export_path_for(path, cups, many):
+    """Return the export path of a CUPS. Add the CUPS when there are several."""
+    if not path:
+        return None
+    if not many:
+        return path
+    root, extension = os.path.splitext(path)
+    return "%s-%s%s" % (root, cups, extension)
 
 
 def cmd_report(args):
     client, account, supplies, listing = load_context(args)
     names = sorted({item["cups"] for item in supplies if item["cups"]})
+    many = len(names) > 1
     zone = args.zone
     if zone == "ceuta-melilla":
         zone = ZONE_CEUTA_MELILLA
@@ -1414,7 +1507,8 @@ def cmd_report(args):
         log("CUPS %s" % cups)
         group = [item for item in supplies if item["cups"] == cups]
         result = _build_report(client, account, cups, group, listing, args.wait,
-                               args.keep_artifacts, zone)
+                               args.keep_artifacts, zone,
+                               export_path_for(args.export_csv, cups, many))
         if result:
             reports.append(result)
     if not reports:
@@ -1454,6 +1548,8 @@ def build_parser():
     parser.add_argument("--verbose", action="store_true", help="print more detail")
     parser.add_argument("--zone", choices=["peninsula", "ceuta-melilla"], default=None,
                         help="2.0TD zone (default: from the postal code of the supply)")
+    parser.add_argument("--export-csv", default=None, metavar="FILE",
+                        help="write the hourly curves to a CSV that a comparator can read")
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--session", default=argparse.SUPPRESS)
     common.add_argument("--sid", default=argparse.SUPPRESS)
@@ -1463,6 +1559,7 @@ def build_parser():
     common.add_argument("--verbose", action="store_true", default=argparse.SUPPRESS)
     common.add_argument("--zone", choices=["peninsula", "ceuta-melilla"],
                         default=argparse.SUPPRESS)
+    common.add_argument("--export-csv", default=argparse.SUPPRESS)
     sub = parser.add_subparsers(dest="command", required=True)
 
     session_cmd = sub.add_parser("set-session", parents=[common],

@@ -13,9 +13,11 @@ and covers every CUPS of the account, one after another. Each report contains:
 - the contracted power per period (P1, P2),
 - the real and estimated consumption totals and the split by P1, P2, P3,
 - the real and estimated consumption by year (with the P1, P2, P3 split),
-  month, and hour,
-- the maximum consumption in one hour per year,
-- the maximum demanded power per year (the full list per month is in the JSON),
+  month, hour, and weekday,
+- the maximum consumption in one hour per year, from the real values,
+- the maximum demanded power per year, with the split by power period (P1 and
+  P2) and the months above the contracted power (the full list per month is in
+  the JSON),
 - a zoom of the last 3 months (the last reading and its delay) and a monthly
   reading map, so you see what is real, estimated or pending.
 
@@ -85,6 +87,10 @@ The tool has these options. They work with every command:
 - `--zone ZONE` sets the 2.0TD zone: `peninsula` or `ceuta-melilla`. Without it,
   the tool reads the postal code of the supply (51xxx is Ceuta, 52xxx is
   Melilla).
+- `--export-csv FILE` writes the hourly curves to a CSV file. The header is the
+  one of the portal (`CUPS;Fecha;Hora;AE_kWh;AS_KWh;AE_AUTOCONS_kwh;REAL/ESTIMADO`),
+  so the file works with the CSV import of the electricity comparators. With
+  several CUPS, the tool adds the CUPS to the name of the file.
 
 Add them before or after the command.
 
@@ -140,13 +146,24 @@ CONSUMPTION
     Hour        real kWh    est. kWh   total kWh
     00           215.885     117.451     333.336
     ...
+  By weekday
+    Day         real kWh    est. kWh   total kWh
+    Mon          891.332     391.535    1282.867
+    ...
 
 MAXIMUM PER YEAR
-  Peak hour: the most energy in one hour (kWh). Peak demand: the top
-  15 minute power (kW), from the portal. They can be on other days.
-  Year   Peak hour  When                  Peak demand  When
-  2024   3.330 kWh  15/12/2024 10 - 11 h     4.760 kW  28/10/2024 22:15
-  2025   3.625 kWh  02/02/2025 21 - 22 h     5.024 kW  20/02/2025 21:45
+  Peak hour: the most energy in one hour (kWh), from the real values.
+  Year   Peak hour  When
+  2024   3.330 kWh  15/12/2024 10 - 11 h
+  2025   3.625 kWh  02/02/2025 21 - 22 h
+
+MAXIMUM DEMANDED POWER (kW, 15 minute measure)
+  The contract has one power for P1 and one power for P2.
+  Year   P1         When                    P2         When
+  2024   4.756 kW   28-10-2024 22:15        3.936 kW   08-09-2024 21:15
+  2025   5.024 kW   20-02-2025 21:45        4.936 kW   23-03-2025 12:15
+  The portal does not return every month.
+  No month above the contracted power.
 
 RECENT (last 3 months)
   Today:        2026-09-14
