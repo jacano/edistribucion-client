@@ -4,6 +4,9 @@ session.json
 # Encrypted credentials (secret)
 credentials.json
 
+# Trace folders (hold the session cookie)
+traces/
+
 # Python
 __pycache__/
 *.py[cod]
