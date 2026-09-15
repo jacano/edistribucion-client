@@ -402,7 +402,7 @@ def load_credentials(path=DEFAULT_CREDENTIALS):
     return username, password
 
 
-# ---------------------------------------------------------------- backend login
+# ---------------------------------------------------------------- portal login
 def _jar_sid(jar):
     for cookie in jar:
         if cookie.name == "sid":
@@ -876,22 +876,14 @@ def build_supplies(listing):
     supplies = []
     for contract in listing.get("lstContAux") or []:
         cups = contract.get("CUPs__r") or {}
-        power = {key.replace("Requested_power_", "P").replace("__c", ""): value
-                 for key, value in contract.items()
-                 if key.startswith("Requested_power_") and value is not None}
         supplies.append({
             "contract_id": contract.get("Id"),
             "cups": cups.get("Name"),
             "cups_id": cups.get("Id"),
-            "tariff": contract.get("Tariff_Code_Description__c"),
-            "type_pm": contract.get("Type_PM__c"),
             "start": contract.get("Version_start_date__c"),
             "end": contract.get("Version_end_date__c"),
-            "address": cups.get("Provisioning_address__c"),
             "city": cups.get("NS_Town_Description__c"),
             "postal_code": cups.get("NS_Postal_Code__c"),
-            "voltage": cups.get("type_of_tension__c"),
-            "contracted_power_kw": power,
         })
     return supplies
 
@@ -1016,7 +1008,7 @@ def cmd_login(args):
         print("Need a user and a password.", file=sys.stderr)
         sys.exit(1)
 
-    print("Logging in by backend...")
+    print("Logging in to the portal...")
     try:
         sid, text = portal_login(username, password)
     except (RuntimeError, urllib.error.URLError, OSError) as exc:
