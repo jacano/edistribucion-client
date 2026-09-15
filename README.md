@@ -47,10 +47,10 @@ Full steps (the first run, the file locations, update, uninstall) are in
 Get the session with one of these commands. Full steps are in
 [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md).
 
-- `login` logs in with the user and the password. No browser. Add
-  `--save` to keep the password in the credential store of the system (DPAPI on
-  Windows, Keychain on macOS, libsecret on Linux). Then the tool logs in again
-  when the session expires.
+- `login` logs in with the user and the password. No browser. Add `--save` to
+  keep the password in the credential store of the system (DPAPI on Windows,
+  Keychain on macOS, libsecret on Linux). Then the tool logs in again when the
+  session expires. Without `--save`, it asks before saving.
 - `import-cookies` reads a `cookies.txt` file. Use the browser extension "Get
   cookies.txt LOCALLY" (Chrome and Firefox); the links are in the guide.
 - `set-session --sid` stores a session value that you already have.

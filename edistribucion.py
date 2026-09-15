@@ -803,11 +803,27 @@ def extract_cookies_from_text(text):
     return found
 
 
+def ask_yes_no(question, default=False):
+    """Ask a question on the terminal. Return the default when not interactive."""
+    if not sys.stdin.isatty():
+        return default
+    hint = "Y/n" if default else "y/N"
+    try:
+        reply = input("%s [%s]: " % (question, hint)).strip().lower()
+    except EOFError:
+        return default
+    if not reply:
+        return default
+    return reply in ("y", "yes", "s", "si", "sí")
+
+
 def cmd_login(args):
     username = args.user
     password = args.password
+    from_file = False
     if not (username and password) and os.path.exists(args.credentials):
         username, password = load_credentials(args.credentials)
+        from_file = True
     if not username:
         username = input("NIF, passport or NIE: ").strip()
     if not password:
@@ -830,6 +846,8 @@ def cmd_login(args):
     session = Session(sid=sid, path=args.session)
     session.save()
     print("Session saved to", args.session)
+    if not args.save and not from_file:
+        args.save = ask_yes_no("Save the credentials for the auto login?")
     if args.save:
         path = save_credentials(username, password, args.credentials)
         print("Credentials saved with %s to %s" % (credential_backend(), path))

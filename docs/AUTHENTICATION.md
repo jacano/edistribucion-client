@@ -35,6 +35,10 @@ Add `--save` to store the credentials:
 python edistribucion.py login --save
 ```
 
+Without `--save`, the tool asks you if you want to save the credentials. It asks
+only on a terminal. In a script (no terminal) it does not save and it does not
+ask.
+
 The credentials go to `credentials.json`. The password is kept in the
 credential store of the system:
 

@@ -22,8 +22,8 @@ edistribucion login --save
 
 It asks for your NIF and your password, and writes `session.json`. The `--save`
 also keeps the password in the credential store of the system (DPAPI on
-Windows, Keychain on macOS, libsecret on Linux). See
-[AUTHENTICATION.md](AUTHENTICATION.md).
+Windows, Keychain on macOS, libsecret on Linux). Without `--save`, it asks if
+you want to keep the password. See [AUTHENTICATION.md](AUTHENTICATION.md).
 
 ## File locations
 

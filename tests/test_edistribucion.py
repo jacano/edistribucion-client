@@ -156,3 +156,25 @@ def test_measure_tariff():
                            {"Id": "c2", "rate": "3.0TD"}]}
     assert ed.measure_tariff(listing, [{"contract_id": "c1"}]) == "2.0TD"
     assert ed.measure_tariff(listing, [{"contract_id": "zz"}]) is None
+
+
+# ------------------------------------------------------------------ ask_yes_no
+class _FakeStdin:
+    def isatty(self):
+        return True
+
+
+def test_ask_yes_no_returns_the_default_without_a_terminal():
+    # The tests have no terminal, so the prompt is skipped.
+    assert ed.ask_yes_no("save?") is False
+    assert ed.ask_yes_no("save?", default=True) is True
+
+
+def test_ask_yes_no_reads_the_answer(monkeypatch):
+    monkeypatch.setattr(ed.sys, "stdin", _FakeStdin())
+    monkeypatch.setattr("builtins.input", lambda prompt="": "y")
+    assert ed.ask_yes_no("save?") is True
+    monkeypatch.setattr("builtins.input", lambda prompt="": "no")
+    assert ed.ask_yes_no("save?", default=True) is False
+    monkeypatch.setattr("builtins.input", lambda prompt="": "")
+    assert ed.ask_yes_no("save?", default=True) is True
