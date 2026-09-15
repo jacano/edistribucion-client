@@ -668,10 +668,12 @@ def parse_cookies_file(path, domain=None):
 
 
 def find_cookies_file():
-    """Find the newest cookies file for the portal in the Downloads folders.
+    """Return the newest cookies file for the portal, by convention.
 
-    Only files that mention `edistribucion` count. This avoids other cookie
-    exports, such as files for other sites.
+    The tool looks in the `Downloads` and `Descargas` folders of your home. A
+    file counts only when it is a `.txt` or `.json` file that mentions
+    `edistribucion`. A name with `cookie` in it goes first. This avoids the
+    cookie files of other sites.
     """
     home = os.path.expanduser("~")
     best = None
@@ -772,7 +774,11 @@ def cmd_set_session(args):
 def cmd_import_cookies(args):
     path = args.file or find_cookies_file()
     if not path:
-        print("No cookies file given, and none found in Downloads.", file=sys.stderr)
+        print("No cookies file given, and no cookies file found in Downloads.\n"
+              "By default the tool uses the newest .txt or .json file in your Downloads\n"
+              "folder that mentions edistribucion. Export the cookies with the browser\n"
+              "extension (see docs/AUTHENTICATION.md), or give the file:\n"
+              "  edistribucion import-cookies <file>", file=sys.stderr)
         sys.exit(1)
     if not args.file:
         print("Using", path)
@@ -1361,7 +1367,8 @@ def build_parser():
     imp = sub.add_parser("import-cookies", parents=[common],
                          help="import cookies from a cookies.txt (Netscape) or JSON file")
     imp.add_argument("file", nargs="?",
-                     help="path to cookies.txt or JSON export (default: newest in Downloads)")
+                     help="path to the cookies file (default: the newest .txt or .json "
+                          "in Downloads that mentions edistribucion)")
     imp.set_defaults(func=cmd_import_cookies)
 
     login_cmd = sub.add_parser("login", parents=[common],

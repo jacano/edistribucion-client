@@ -68,15 +68,31 @@ flow, landing page, home). The home page then sets the `sid` cookie and the
 This command reads a `cookies.txt` file (the Netscape format) or a JSON export.
 It keeps only the cookies of the portal domain.
 
-The tool finds the newest cookies file in your Downloads folder. You can also
-give the path.
+### The convention for the file
+
+By default the tool does not ask for a path. It looks in your `Downloads` and
+`Descargas` folders and uses the newest file that matches this rule:
+
+- the name ends in `.txt` or `.json`,
+- the file mentions `edistribucion`,
+- a file with `cookie` in the name goes first.
+
+The extension writes a name like `zonaprivada.edistribucion.com_cookies.txt`.
+So the usual steps are:
+
+1. Log in to the portal in the browser.
+2. Export the cookies with the extension for the current site.
+3. The browser saves the file in `Downloads`.
+4. Run the command with no path.
 
 ```bash
 python edistribucion.py import-cookies
 ```
 
+If the file is in another folder, give the path:
+
 ```bash
-python edistribucion.py import-cookies cookies.txt
+python edistribucion.py import-cookies "C:\path\to\cookies.txt"
 ```
 
 Export the file right before the import. Each new login can end the previous
