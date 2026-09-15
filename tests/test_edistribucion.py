@@ -178,3 +178,53 @@ def test_ask_yes_no_reads_the_answer(monkeypatch):
     assert ed.ask_yes_no("save?", default=True) is False
     monkeypatch.setattr("builtins.input", lambda prompt="": "")
     assert ed.ask_yes_no("save?", default=True) is True
+
+
+# ------------------------------------------------------------------- cmd_login
+class _FakeClient:
+    def __init__(self, session):
+        pass
+
+    def whoami(self):
+        return {"name": "Test User"}
+
+
+def login_args(tmp_path, save):
+    import argparse
+    return argparse.Namespace(user="user", password="pass",
+                              credentials=str(tmp_path / "credentials.json"),
+                              session=str(tmp_path / "session.json"), save=save)
+
+
+def prepare_login(monkeypatch, saved, answer, asked=None):
+    monkeypatch.setattr(ed, "portal_login", lambda user, password: ("FAKESID", "raw"))
+    monkeypatch.setattr(ed, "save_credentials",
+                        lambda u, p, path: saved.append(path) or path)
+    monkeypatch.setattr(ed, "Client", _FakeClient)
+    def fake_ask(question, default=False):
+        if asked is not None:
+            asked.append(question)
+        return answer
+    monkeypatch.setattr(ed, "ask_yes_no", fake_ask)
+
+
+def test_login_asks_and_saves(monkeypatch, tmp_path):
+    saved = []
+    prepare_login(monkeypatch, saved, answer=True)
+    ed.cmd_login(login_args(tmp_path, save=False))
+    assert saved == [str(tmp_path / "credentials.json")]
+
+
+def test_login_does_not_save_on_no(monkeypatch, tmp_path):
+    saved = []
+    prepare_login(monkeypatch, saved, answer=False)
+    ed.cmd_login(login_args(tmp_path, save=False))
+    assert saved == []
+
+
+def test_login_saves_with_the_flag_without_asking(monkeypatch, tmp_path):
+    saved, asked = [], []
+    prepare_login(monkeypatch, saved, answer=False, asked=asked)
+    ed.cmd_login(login_args(tmp_path, save=True))
+    assert saved == [str(tmp_path / "credentials.json")]
+    assert asked == []
