@@ -1529,8 +1529,10 @@ def _print_report(result, titled=True):
     print("RECENT (last 3 months)")
     print("  Today:        %s" % recent["today"])
     if recent["last_reading"]:
-        print("  Last reading: %s (%s, %d days old)"
-              % (recent["last_reading"], labels[recent["last_status"]], recent["delay_days"]))
+        days = recent["delay_days"]
+        print("  Last reading: %s (%s, %d %s old)"
+              % (recent["last_reading"], labels[recent["last_status"]], days,
+                 "day" if days == 1 else "days"))
     print("  Ranges:")
     for item in recent["ranges"]:
         span = (item["from"] if item["from"] == item["to"]
