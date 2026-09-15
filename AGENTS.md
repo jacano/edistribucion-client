@@ -107,7 +107,8 @@ See `docs/ASSUMPTIONS.md` for the full list of assumptions and limits.
 | ------- | ---------- |
 | `Could not obtain aura.token (expired session?)` | the session expired. Tell the user to run `login`. |
 | `Aura error ...` | the portal returned an error. Show the message. |
-| `No sid found in the text.` | the text had no session. Ask for the value again. |
+| `No sid value found. Pass --sid or --text.` | the value had no session. Ask for the value again. |
+| `No sid found in FILE` | the cookies file had no session. Export the cookies again. |
 
 ## Tests and lint
 
