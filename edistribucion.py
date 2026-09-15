@@ -1653,7 +1653,7 @@ def export_path_for(path, cups, many):
 def cmd_report(args):
     client, account, supplies, listing = load_context(args)
     names = sorted({item["cups"] for item in supplies if item["cups"]})
-    many = len(names) > 1
+    several = len(names) > 1
     zone = args.zone
     if zone == "ceuta-melilla":
         zone = ZONE_CEUTA_MELILLA
@@ -1663,7 +1663,7 @@ def cmd_report(args):
         group = [item for item in supplies if item["cups"] == cups]
         result = _build_report(client, account, cups, group, listing, args.wait,
                                args.keep_artifacts, zone,
-                               export_path_for(args.export_csv, cups, many))
+                               export_path_for(args.export_csv, cups, several))
         if result:
             reports.append(result)
     if not reports:

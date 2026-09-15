@@ -97,7 +97,7 @@ See `docs/ASSUMPTIONS.md` for the full list of assumptions and limits.
 - Report the real and the estimated values separately.
 - Always report the split by P1, P2, P3.
 - Report the last reading and the recent zoom (real, estimated and pending).
-- Report the contracted power and the peak demand.
+- Report the contracted power and the maximum demanded power per period.
 - Do not print the session cookie or the file `session.json`.
 - This tool reads data only. Do not try to change data on the portal.
 

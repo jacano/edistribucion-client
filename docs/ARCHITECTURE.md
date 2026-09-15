@@ -141,7 +141,7 @@ flowchart TD
     E --> F{"day is estimated with 0 kWh?"}
     F -- yes --> G["pending: no reading yet, do not count"]
     F -- no --> H["count the hour"]
-    H --> I["aggregate: totals, periods,<br/>by year, month and hour, peaks"]
+    H --> I["aggregate: totals, periods, groups by year,<br/>month, hour and weekday, peaks, real streak"]
     I --> J["report (text) or JSON"]
 ```
 
@@ -149,25 +149,33 @@ flowchart TD
   or 25 rows. See section 7.
 - A day with no reading yet comes as estimated with 0 kWh. The tool calls it
   `pending` and keeps it out of the totals. The recent zoom shows it.
+- `longest_real_run` finds the longest period in a row with real data only.
+  `aggregate` keeps its totals by P1, P2 and P3, so a comparator can use the
+  real hours only.
 
 ## 6. The 2.0TD period
 
 The portal does not send the tariff period with the ZIP. The tool works out the
-period from the date and the hour. See
+period from the date, the hour and the zone. See
 [TARIFF_2_0TD.md](TARIFF_2_0TD.md) for the law and the details.
 
 ```mermaid
 flowchart TD
-    S["day + hour"] --> W{"Saturday or Sunday?"}
+    S["day + hour + zone"] --> W{"Saturday or Sunday?"}
     W -- yes --> P3a["P3"]
     W -- no --> H{"fixed national holiday?"}
     H -- yes --> P3b["P3"]
-    H -- no --> P1{"10-14 or 18-22?"}
+    H -- no --> P1{"peak window of the zone?"}
     P1 -- yes --> P1o["P1"]
-    P1 -- no --> P2{"8-10, 14-18 or 22-24?"}
+    P1 -- no --> P2{"flat window of the zone?"}
     P2 -- yes --> P2o["P2"]
     P2 -- no --> P3c["P3"]
 ```
+
+The peak and flat windows depend on the zone: the Peninsula, Baleares and
+Canarias one set, and Ceuta and Melilla another set, one hour later.
+`supply_zone` reads the postal code (51xxx is Ceuta, 52xxx is Melilla), then the
+city name, then the Peninsula.
 
 ## 7. The day status
 
@@ -247,5 +255,9 @@ the tool uses the one ZIP instead. See
 | Massive download | `create_zip`, `get_files`, `_download_measure_zip` |
 | Cleanup on the portal | `list_notifications`, `delete_notifications`, `download_notification_ids`, `delete_download_leftovers` |
 | ZIP read | `read_zip_rows`, `clock_hour`, `zip_hours` |
-| Period and day logic | `tariff_period`, `day_status`, `month_map`, `recent_ranges` |
-| Aggregation and report | `aggregate`, `fetch_hours`, `collect_consumption`, `_build_report`, `_print_report` |
+| CSV export | `write_hours_csv`, `export_path_for` |
+| Zone | `supply_zone`, `ZONE_PEAK_HOURS`, `ZONE_FLAT_HOURS` |
+| Period and day logic | `tariff_period`, `in_hour_windows`, `day_status`, `month_map`, `recent_ranges` |
+| Demanded power | `get_maximeter`, `_max_demand`, `demand_point`, `max_demand_periods` |
+| Aggregation and report | `aggregate`, `longest_real_run`, `fetch_hours`, `collect_consumption`, `_build_report`, `_print_report` |
+| Trace | `Trace`, `trace_start`, `headers_text`, `body_text` |

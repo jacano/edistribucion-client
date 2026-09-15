@@ -80,7 +80,7 @@ Option:
 
 - `--json` gives raw JSON. With several CUPS, the JSON is a list.
 
-The tool has these options. They work with every command:
+The tool has these options. Add them before or after the command:
 
 - `--wait SECONDS` sets the time to wait for the portal zip (default 180).
 - `--keep-artifacts` keeps the zip file and the portal notification (see below).
@@ -96,8 +96,6 @@ The tool has these options. They work with every command:
 - `--trace [DIR]` writes every request, every response and every downloaded file
   to a folder, one folder for each run. The default folder is `traces` in the
   state folder. See "Troubleshooting" below.
-
-Add them before or after the command.
 
 ### The zip file and the notification
 
@@ -251,6 +249,9 @@ The file `session.json` holds your live session cookie. The file
 the encrypted password. On macOS and Linux the password stays in the Keychain
 or in libsecret, and the file holds the username only. The `.gitignore` file
 excludes both files. Do not commit them. Do not share them.
+
+A `--trace` folder holds the requests and the responses as they are, with the
+session cookie and the token. Keep the folder private too.
 
 The tool reads data from your own account only.
 

@@ -37,3 +37,11 @@ tool was built and tested with one real 2.0TD account.
   `--keep-artifacts` to keep both on the portal.
 - The portal makes no notification when the role has the setting to stop the
   notifications. Then there is nothing to delete.
+
+## Trace
+
+- `--trace` writes every request, every response and every downloaded file to a
+  folder, one folder for each run.
+- The folder holds the session cookie and the token as they are. The tool masks
+  only the user and the password of a `login` run.
+- Keep the folder private. Do not put it in a public place.

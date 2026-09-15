@@ -37,6 +37,9 @@ The tool looks for `session.json` and `credentials.json` in this order:
 
 So the installed tool works from any folder.
 
+The `--trace` folder also goes to the user config folder, in `traces`. Add a
+path to change it (`--trace DIR`).
+
 ## Run without installing
 
 ```bash
