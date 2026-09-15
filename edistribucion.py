@@ -816,7 +816,7 @@ def ask_yes_no(question, default=False):
         return default
     if not reply:
         return default
-    return reply in ("y", "yes", "s", "si", "sí")
+    return reply in ("y", "yes")
 
 
 def cmd_login(args):
