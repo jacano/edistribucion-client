@@ -129,7 +129,7 @@ HTTP_TIMEOUT = 40
 DOWNLOAD_TIMEOUT = 90
 DOWNLOAD_TYPE = 1                    # 1 = hourly curves
 FILE_TYPES = ["01", "50", "51"]      # the portal file types to list
-ZIP_WAIT_SECONDS = 3                 # seconds between two checks
+ZIP_WAIT_SECONDS = 5                 # seconds between two checks
 ZIP_WAIT_LIMIT = 180                 # seconds to wait for the zip
 
 

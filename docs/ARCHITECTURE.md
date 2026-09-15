@@ -99,7 +99,7 @@ sequenceDiagram
     P-->>C: lstNotifications (the current notifications)
     C->>P: createZip (roleId, lstCupsIds, data, start, end, downloadType=1)
     P-->>C: "request processed" (async)
-    loop every 3 s, up to --wait seconds (default 180)
+    loop every 5 s, up to --wait seconds (default 180)
         C->>P: getFiles
         P-->>C: lstFiles
     end
