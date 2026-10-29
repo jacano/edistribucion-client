@@ -1580,7 +1580,7 @@ def _print_report(result, titled=True):
               % (year, "%.3f kWh" % peak["kwh"], "%s %s" % (peak["date"], peak["hour"])))
     print()
     print("MAXIMUM DEMANDED POWER (kW, 15 minute measure)")
-    print("  The contract has one power for P1 and one power for P2.")
+    print("  In 2.0TD only P1 and P2 have a contracted power; P3 has none.")
     periods = result["max_demand_by_period"]
     if periods:
         print("  %-4s  %11s  %-18s  %11s  %s"

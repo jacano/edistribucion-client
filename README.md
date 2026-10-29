@@ -199,7 +199,7 @@ MAXIMUM PER YEAR
   2025   3.625 kWh  02/02/2025 21 - 22 h
 
 MAXIMUM DEMANDED POWER (kW, 15 minute measure)
-  The contract has one power for P1 and one power for P2.
+  In 2.0TD only P1 and P2 have a contracted power; P3 has none.
   Year           P1  When                         P2  When
   2024     4.592 kW  27-08-2024 22:00       4.756 kW  28-10-2024 22:15
   2025     5.024 kW  20-02-2025 21:45       4.412 kW  18-04-2025 22:30
