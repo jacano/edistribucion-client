@@ -679,6 +679,33 @@ def supply_zone(supply):
     return ZONE_PENINSULA
 
 
+def supply_address(supply):
+    """Return the supply address as one clean line.
+
+    The portal joins the parts with dots: the street, the postal code and the
+    town, the town again, and the province. This keeps the street, the postal
+    code and the town, and adds the province only when it is different. For
+    example:
+    "CL MAYOR 1 2\u00b0 A.28001 MADRID.MADRID.MADRID"
+    becomes "CL MAYOR 1 2\u00b0 A, 28001 MADRID".
+    """
+    raw = " ".join(str(supply.get("address") or "").split())
+    if not raw:
+        return ""
+    match = re.match(r"^(?P<street>.*?)\.\s*(?P<postal>\d{5})\s+(?P<town>[^.]+)"
+                     r"(?:\.(?P<rest>.*))?$", raw)
+    if not match:
+        return raw.replace(".", ", ")
+    street = match.group("street").strip()
+    town = match.group("town").strip()
+    address = "%s, %s %s" % (street, match.group("postal"), town)
+    parts = [part.strip() for part in (match.group("rest") or "").split(".") if part.strip()]
+    province = parts[-1] if parts else ""
+    if province and province.casefold() != town.casefold():
+        address += ", " + province
+    return address
+
+
 def in_hour_windows(hour, windows):
     """Say if a clock hour is in one of the (start, end) windows."""
     return any(start <= hour < end for start, end in windows)
@@ -738,6 +765,12 @@ def in_window(day, window):
     if not window or window[0] is None:
         return True
     return window[0] <= day <= window[1]
+
+
+def in_month_range(month_key, first, last):
+    """Say if a YYYY-MM key is inside the months of the first and last day."""
+    return ("%04d-%02d" % (first.year, first.month) <= month_key
+            <= "%04d-%02d" % (last.year, last.month))
 
 
 def read_zip_rows(payload):
@@ -916,6 +949,7 @@ def build_supplies(listing):
             "end": contract.get("Version_end_date__c"),
             "city": cups.get("NS_Town_Description__c"),
             "postal_code": cups.get("NS_Postal_Code__c"),
+            "address": cups.get("Provisioning_address__c"),
         })
     return supplies
 
@@ -1324,9 +1358,28 @@ def demand_point(point):
         kw = float(str(point["val"]).replace(",", "."))
     except ValueError:
         return None
-    stamp = str(point.get("date") or "")
+    stamp = str(point.get("fmtDate") or point.get("date") or "")
     day, _, hour = stamp.partition(" ")
-    return {"kw": kw, "date": day, "hour": hour or point.get("hour")}
+    hour = point.get("hour") or hour
+    if hour.count(":") == 2:
+        hour = hour[:5]
+    return {"kw": kw, "date": day, "hour": hour}
+
+
+def max_demand_points(row):
+    """Return the P1 and P2 points of one maximeter row.
+
+    The 2.0TD values are in `periodData` (T1, T2 and T3). The older `punta` and
+    `valle` fields are not the 2.0TD P1 and P2: `punta` is the top of T1 and T2,
+    and `valle` is T3. Use `periodData` only.
+    """
+    periods = row.get("periodData") or {}
+    points = {}
+    for source, name in (("T1", "P1"), ("T2", "P2")):
+        point = demand_point(periods.get(source))
+        if point and point["date"]:
+            points[name] = point
+    return points
 
 
 def _max_demand(client, account, cups_id, year_from, year_to):
@@ -1341,11 +1394,7 @@ def _max_demand(client, account, cups_id, year_from, year_to):
             date = point.get("date") or ""
             parts = date.split("-")
             key = "%s-%s" % (parts[2], parts[1]) if len(parts) == 3 else date
-            entry = {}
-            for source, name in (("punta", "P1"), ("valle", "P2")):
-                found = demand_point(point.get(source))
-                if found:
-                    entry[name] = found
+            entry = max_demand_points(point)
             if entry:
                 monthly[key] = entry
     return monthly
@@ -1453,6 +1502,8 @@ def _print_report(result, titled=True):
     if titled:
         print("REPORT")
         print("CUPS:", result["cups"])
+    if result.get("address"):
+        print("Address:", result["address"])
     print("Tariff:", result["tariff"])
     print("Zone:", ZONE_LABELS.get(result["zone"], result["zone"]))
     print("Contracted power:", power_txt or "-")
@@ -1531,32 +1582,35 @@ def _print_report(result, titled=True):
     print("MAXIMUM DEMANDED POWER (kW, 15 minute measure)")
     print("  The contract has one power for P1 and one power for P2.")
     periods = result["max_demand_by_period"]
-    print("  %-4s  %11s  %-18s  %11s  %s"
-          % ("Year", "P1", "When", "P2", "When"))
-    for year in sorted(periods):
-        slot = periods[year]
-        cells = []
-        for name in ("P1", "P2"):
-            point = slot.get(name)
-            cells.append((" %.3f kW" % point["kw"], "%s %s" % (point["date"], point["hour"]))
-                         if point else ("-", "-"))
+    if periods:
         print("  %-4s  %11s  %-18s  %11s  %s"
-              % (year, cells[0][0], cells[0][1], cells[1][0], cells[1][1]))
-    limits = (("P1", result["contracted_power_kw"].get("P1")),
-              ("P2", result["contracted_power_kw"].get("P2")))
-    over = []
-    for month_key, info in sorted(result["max_demand_by_month"].items()):
-        for name, limit in limits:
-            point = info.get(name)
-            if point and limit and point["kw"] > limit:
-                over.append((month_key, name, point["kw"]))
-    print("  The portal does not return every month.")
-    if over:
-        print("  Months above the contracted power (possible excess):")
-        for month_key, name, kw in over:
-            print("    %-8s %-3s %8.3f kW" % (month_key, name, kw))
+              % ("Year", "P1", "When", "P2", "When"))
+        for year in sorted(periods):
+            slot = periods[year]
+            cells = []
+            for name in ("P1", "P2"):
+                point = slot.get(name)
+                cells.append((" %.3f kW" % point["kw"], "%s %s" % (point["date"], point["hour"]))
+                             if point else ("-", "-"))
+            print("  %-4s  %11s  %-18s  %11s  %s"
+                  % (year, cells[0][0], cells[0][1], cells[1][0], cells[1][1]))
+        limits = (("P1", result["contracted_power_kw"].get("P1")),
+                  ("P2", result["contracted_power_kw"].get("P2")))
+        over = []
+        for month_key, info in sorted(result["max_demand_by_month"].items()):
+            for name, limit in limits:
+                point = info.get(name)
+                if point and limit and point["kw"] > limit:
+                    over.append((month_key, name, point["kw"]))
+        print("  The portal does not return every month.")
+        if over:
+            print("  Months above the current contracted power (possible excess):")
+            for month_key, name, kw in over:
+                print("    %-8s %-3s %8.3f kW" % (month_key, name, kw))
+        else:
+            print("  No month above the contracted power.")
     else:
-        print("  No month above the contracted power.")
+        print("  No maximum demanded power data for this period.")
     print()
     recent = result["recent"]
     labels = {"R": "real", "E": "estimated", "M": "mixed",
@@ -1590,7 +1644,7 @@ def _build_report(client, account, cups, group, listing, wait_seconds, keep_arti
                   zone=None, export_path=None, months=0):
     """Build the report of one CUPS. Return None when the CUPS has no data."""
     visibility = account["visibility_id"]
-    current = next((item for item in group if not item.get("end")), group[-1])
+    current = next((item for item in group if not item.get("end")), group[0])
     zone = zone or supply_zone(current)
     log("Zone: %s" % ZONE_LABELS.get(zone, zone))
     window = month_window(months)
@@ -1614,6 +1668,8 @@ def _build_report(client, account, cups, group, listing, wait_seconds, keep_arti
         % (data["from"].year, data["to"].year))
     monthly_power = _max_demand(client, account, current["cups_id"],
                                 data["from"].year, data["to"].year)
+    monthly_power = {key: value for key, value in monthly_power.items()
+                     if in_month_range(key, data["from"], data["to"])}
     counts = data["day_counts"]
     window_end = max(counts) if counts else data["to"]
     today = date.today()
@@ -1622,6 +1678,7 @@ def _build_report(client, account, cups, group, listing, wait_seconds, keep_arti
     ranges = recent_ranges(counts, window_end)
     return {
         "cups": cups,
+        "address": supply_address(current),
         "tariff": tariff,
         "zone": zone,
         "contracted_power_kw": contracted,
@@ -1705,7 +1762,7 @@ def cmd_report(args):
         print("No data.", file=sys.stderr)
         sys.exit(1)
     if args.json:
-        print(json.dumps(reports, ensure_ascii=False, indent=2))
+        print(json.dumps(reports, ensure_ascii=True, indent=2))
         return
     many = len(reports) > 1
     if many:

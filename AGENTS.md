@@ -55,7 +55,7 @@ for each CUPS of the account, one after another. With several CUPS, it first
 prints a summary table, and each report has a banner `CUPS i of N`. It
 contains:
 
-- the CUPS, the tariff, and the contracted power per period,
+- the CUPS, the address, the tariff, and the contracted power per period,
 - the period covered (the first and the last date),
 - the real and estimated totals and the split by `P1`, `P2`, `P3`,
 - the consumption by year (with the P1, P2, P3 split), month, hour, and

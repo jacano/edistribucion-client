@@ -67,6 +67,33 @@ def test_supply_zone_from_city():
     assert ed.supply_zone({}) == ed.ZONE_PENINSULA
 
 
+# ------------------------------------------------------------------ address
+def test_supply_address_drops_the_repeated_town():
+    supply = {"address": "CL MAYOR 1 2\u00b0 A.28001 MADRID.MADRID.MADRID"}
+    assert ed.supply_address(supply) == "CL MAYOR 1 2\u00b0 A, 28001 MADRID"
+
+
+def test_supply_address_keeps_the_province():
+    supply = {"address": "AV EJEMPLO 1 2 BLQ 3.28001 MADRID.MADRID.GUADALAJARA"}
+    assert ed.supply_address(supply) == "AV EJEMPLO 1 2 BLQ 3, 28001 MADRID, GUADALAJARA"
+
+
+def test_supply_address_fallbacks():
+    assert ed.supply_address({}) == ""
+    assert ed.supply_address({"address": "CL MAYOR 1 28001 MADRID"}) == "CL MAYOR 1 28001 MADRID"
+
+
+def test_build_supplies_reads_the_address():
+    listing = {"lstContAux": [{
+        "Id": "c1",
+        "Version_start_date__c": "2026-01-01",
+        "CUPs__r": {"Name": "ES00",
+                    "Provisioning_address__c": "CL MAYOR 1.28001 MADRID.MADRID.MADRID"},
+    }]}
+    supply = ed.build_supplies(listing)[0]
+    assert supply["address"] == "CL MAYOR 1.28001 MADRID.MADRID.MADRID"
+
+
 # --------------------------------------------------------------------- window
 def test_months_back():
     assert ed.months_back(date(2026, 9, 15), 12) == date(2025, 9, 1)
@@ -91,6 +118,14 @@ def test_in_window():
     assert not ed.in_window(date(2026, 9, 1), window)
     assert ed.in_window(date(2020, 1, 1), (None, None))
     assert ed.in_window(date(2020, 1, 1), None)
+
+
+def test_in_month_range():
+    first, last = date(2025, 11, 15), date(2026, 10, 2)
+    assert ed.in_month_range("2025-11", first, last)
+    assert ed.in_month_range("2026-10", first, last)
+    assert not ed.in_month_range("2025-10", first, last)
+    assert not ed.in_month_range("2026-11", first, last)
 
 
 # ------------------------------------------------------------------- clock_hour
@@ -189,6 +224,35 @@ def test_demand_point():
     assert point == {"kw": 5.024, "date": "20-02-2025", "hour": "21:45"}
     assert ed.demand_point(None) is None
     assert ed.demand_point({"val": ""}) is None
+
+
+def test_demand_point_prefers_the_formatted_date():
+    point = ed.demand_point({"val": 4.276, "date": "2026-06-18 21:45:00",
+                             "fmtDate": "18-06-2026 21:45"})
+    assert point == {"kw": 4.276, "date": "18-06-2026", "hour": "21:45"}
+
+
+def test_max_demand_points_uses_the_2_0td_periods():
+    row = {
+        "valid": True,
+        "punta": {"val": "4,276", "date": "18-06-2026 21:45"},
+        "valle": {"val": "2,568", "date": "28-06-2026 11:45"},
+        "periodData": {
+            "T1": {"val": 4.276, "fmtDate": "18-06-2026 21:45"},
+            "T2": {"val": 2.748, "fmtDate": "19-06-2026 09:30"},
+            "T3": {"val": 2.568, "fmtDate": "28-06-2026 11:45"},
+        },
+    }
+    points = ed.max_demand_points(row)
+    assert points["P1"]["kw"] == 4.276
+    assert points["P2"]["kw"] == 2.748
+
+
+def test_max_demand_points_skips_a_period_without_a_date():
+    row = {"periodData": {"T1": {"val": 4.0, "fmtDate": "18-06-2026 21:45"},
+                          "T2": {"val": 0.0, "fmtDate": ""}}}
+    points = ed.max_demand_points(row)
+    assert points == {"P1": {"kw": 4.0, "date": "18-06-2026", "hour": "21:45"}}
 
 
 def test_max_demand_periods_picks_the_top_of_each_period():

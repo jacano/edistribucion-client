@@ -7,6 +7,7 @@ third-party package.
 It gives one **full report** for each CUPS of the account. Each report contains:
 
 - the tariff of the supply,
+- the address of the supply,
 - the zone of the supply (the Peninsula, Baleares and Canarias hours, or the
   Ceuta and Melilla hours),
 - the contracted power per period (P1, P2),
@@ -152,9 +153,10 @@ Example output:
 ```
 REPORT
 CUPS: ES0031100000000000NN0N
+Address: CL MAYOR 1, 28001 MADRID
 Tariff: 2.0TD
 Zone: Peninsula, Baleares and Canarias
-Contracted power: P1 4.0 kW, P2 4.0 kW
+Contracted power: P1 5.2 kW, P2 5.2 kW
 Period: 2024-01-16 -> 2026-09-12
 
 CONSUMPTION
@@ -199,8 +201,8 @@ MAXIMUM PER YEAR
 MAXIMUM DEMANDED POWER (kW, 15 minute measure)
   The contract has one power for P1 and one power for P2.
   Year           P1  When                         P2  When
-  2024     4.756 kW  28-10-2024 22:15       3.936 kW  08-09-2024 21:15
-  2025     5.024 kW  20-02-2025 21:45       4.936 kW  23-03-2025 12:15
+  2024     4.592 kW  27-08-2024 22:00       4.756 kW  28-10-2024 22:15
+  2025     5.024 kW  20-02-2025 21:45       4.412 kW  18-04-2025 22:30
   The portal does not return every month.
   No month above the contracted power.
 

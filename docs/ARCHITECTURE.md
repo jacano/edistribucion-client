@@ -252,6 +252,7 @@ the tool uses the one ZIP instead. See
 | Browserless login | `portal_login`, `login_context` |
 | Session file | `Session` |
 | Context and supplies | `load_context`, `build_supplies`, `list_measure_cups` |
+| Address | `supply_address`, `build_supplies` |
 | Massive download | `create_zip`, `get_files`, `_download_measure_zip` |
 | Cleanup on the portal | `list_notifications`, `delete_notifications`, `download_notification_ids`, `delete_download_leftovers` |
 | ZIP read | `read_zip_rows`, `clock_hour`, `zip_hours` |
